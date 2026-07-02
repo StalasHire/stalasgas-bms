@@ -191,7 +191,7 @@
     <div class="who">
       <span id="who-name"></span>
       <span class="role-pill" id="who-role"></span>
-      <div id="notif-bell" style="display:none;position:relative;cursor:pointer;" title="New orders">
+      <div id="notif-bell" style="display:none;position:relative;cursor:pointer;align-items:center;" title="New orders">
         <span style="font-size:20px;">🔔</span>
         <span id="notif-count" style="
           position:absolute;top:-6px;right:-8px;background:var(--ember);color:#fff;
@@ -386,6 +386,9 @@ async function loadProfileAndRoute(){
   document.getElementById('app').style.display = 'block';
   document.getElementById('who-name').textContent = profile.full_name;
   document.getElementById('who-role').textContent = profile.role;
+  if(profile.role === 'admin'){
+    document.getElementById('notif-bell').style.display = 'flex';
+  }
   routeToDashboard();
 }
 
@@ -411,7 +414,6 @@ let notifications = [];
 function startOrderNotifications(){
   const bell = document.getElementById('notif-bell');
   if(!bell) return;
-  bell.style.display = 'flex';
 
   // Toggle panel on bell click
   bell.addEventListener('click', (e)=>{
