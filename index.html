@@ -520,11 +520,18 @@ function customerSearchHTML(){
 function wireCustomerSearch(){
   const input = document.getElementById('cust-search');
   const resultsEl = document.getElementById('cust-results');
+  if(!input || !resultsEl) return;
+  // Clone to remove any old listeners before re-attaching
+  const fresh = input.cloneNode(true);
+  input.parentNode.replaceChild(fresh, input);
   let timer;
-  input.addEventListener('input', ()=>{
+  fresh.addEventListener('input', ()=>{
     clearTimeout(timer);
-    timer = setTimeout(()=>runCustomerSearch(input.value.trim(), resultsEl), 350);
+    const q = fresh.value.trim();
+    if(!q){ resultsEl.innerHTML=''; return; }
+    timer = setTimeout(()=>runCustomerSearch(q, resultsEl), 350);
   });
+  fresh.focus();
 }
 
 async function runCustomerSearch(query, resultsEl){
@@ -713,7 +720,6 @@ async function renderAdminDashboard(){
   `;
   renderOrdersTable(orders, true, drivers || []);
   wireOrderForm(()=>renderAdminDashboard());
-  wireCustomerSearch();
 
   document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -722,6 +728,7 @@ async function renderAdminDashboard(){
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).style.display='block';
       if(btn.dataset.tab === 'reports') renderReports(orders);
+      if(btn.dataset.tab === 'customers') wireCustomerSearch();
       if(btn.dataset.tab === 'staff') loadStaffList();
     });
   });
