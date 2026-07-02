@@ -1156,58 +1156,211 @@ async function renderSalesDashboard(){
 /* ============ DRIVER DASHBOARD ============ */
 async function renderDriverDashboard(){
   const main = document.getElementById('main-content');
-  main.innerHTML = `<div class="empty-state">Loading your deliveries…</div>`;
-  const { data: orders, error } = await sb.from('orders')
-    .select('*')
-    .eq('assigned_driver', currentProfile.id)
-    .neq('status', 'Delivered')
-    .neq('status', 'Cancelled')
-    .order('created_at', { ascending:true });
+  main.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-  if(error){ main.innerHTML = `<div class="empty-state">Could not load deliveries: ${error.message}</div>`; return; }
+  const [{ data: orders, error }, { data: myStock }] = await Promise.all([
+    sb.from('orders')
+      .select('*')
+      .eq('assigned_driver', currentProfile.id)
+      .neq('status', 'Delivered')
+      .neq('status', 'Cancelled')
+      .order('created_at', { ascending:true }),
+    sb.from('driver_stock')
+      .select('*')
+      .eq('driver_id', currentProfile.id)
+  ]);
+
+  if(error){ main.innerHTML = `<div class="empty-state">Could not load: ${error.message}</div>`; return; }
 
   main.innerHTML = `
-    <div class="panel">
-      <h2>Your deliveries today</h2>
-      <div id="driver-orders"></div>
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="d-deliveries">Deliveries</button>
+      <button class="tab-btn" data-tab="d-stock">My Stock</button>
+      <button class="tab-btn" data-tab="d-empties">Empties</button>
+    </div>
+
+    <!-- DELIVERIES TAB -->
+    <div class="tab-content" id="tab-d-deliveries">
+      <div class="panel">
+        <h2>Your deliveries today</h2>
+        <div id="driver-orders"></div>
+      </div>
+    </div>
+
+    <!-- VEHICLE STOCK TAB -->
+    <div class="tab-content" id="tab-d-stock" style="display:none;">
+      <div class="panel">
+        <h2>My vehicle stock</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Full and empty cylinders currently on your truck. Update and save after loading or returning stock.</p>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Size</th><th>Full</th><th>Empty</th></tr></thead>
+          <tbody>
+            ${CYL_SIZES.map(size=>{
+              const row = (myStock||[]).find(r=>r.cylinder_size===size);
+              return `<tr>
+                <td><strong>${size}</strong></td>
+                <td><input type="number" min="0" class="dstock-input" data-size="${size}" data-type="full" value="${row?.full_count||0}" style="width:70px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;"></td>
+                <td><input type="number" min="0" class="dstock-input" data-size="${size}" data-type="empty" value="${row?.empty_count||0}" style="width:70px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;"></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+        <button class="primary" id="save-dstock-btn" style="margin-top:14px;max-width:200px;">Save stock</button>
+      </div>
+    </div>
+
+    <!-- EMPTIES TAB -->
+    <div class="tab-content" id="tab-d-empties" style="display:none;">
+      <div class="panel">
+        <h2>Log empty cylinders collected</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Record empties collected from customers today.</p>
+        <div class="form-grid">
+          <div>
+            <label>Cylinder size</label>
+            <select id="empty-size"><option value="">Select</option>${CYL_SIZES.map(s=>`<option>${s}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label>Quantity collected</label>
+            <input id="empty-qty" type="number" min="1" value="1">
+          </div>
+          <div class="full">
+            <label>Note (optional)</label>
+            <input id="empty-note" placeholder="e.g. collected from Thandi on 12 Voortrekker">
+          </div>
+        </div>
+        <button class="primary" id="log-empty-btn" style="margin-top:14px;max-width:220px;">Log empties</button>
+      </div>
+      <div class="panel">
+        <h2>Today's empties log</h2>
+        <div id="empties-log"><div class="empty-state">Loading…</div></div>
+      </div>
     </div>
   `;
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn[data-tab^="d-"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn[data-tab^="d-"]').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content[id^="tab-d-"]').forEach(c=>c.style.display='none');
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).style.display='block';
+      if(btn.dataset.tab==='d-empties') loadEmptiesLog();
+    });
+  });
+
+  // Render deliveries
   const container = document.getElementById('driver-orders');
   if(!orders.length){
     container.innerHTML = `<div class="empty-state">No deliveries assigned to you right now.</div>`;
-    return;
-  }
-  container.innerHTML = orders.map(o=>`
-    <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <strong>#${1000+o.id} — ${o.customer_name}</strong>
-        <span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span>
+  } else {
+    container.innerHTML = orders.map(o=>`
+      <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>#${1000+o.id} — ${o.customer_name}</strong>
+          <span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span>
+        </div>
+        <div style="font-size:13px;color:#6b5a4a;margin-top:4px;">${o.delivery_address||'No address'} · ${o.customer_phone}</div>
+        <div style="font-size:13px;margin-top:4px;">${o.order_type} — ${o.quantity} × ${o.cylinder_size}</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-small mark-out" data-id="${o.id}">Out for delivery</button>
+          <button class="btn-small mark-delivered" data-id="${o.id}">Mark delivered</button>
+          <a href="https://wa.me/${o.customer_phone.replace(/^0/,'27')}?text=${encodeURIComponent(`Hi ${o.customer_name}, your Stala's Gas order #${1000+o.id} is on its way! (${o.quantity} x ${o.cylinder_size} ${o.order_type})`)}"
+            target="_blank" class="btn-small" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WhatsApp customer</a>
+        </div>
       </div>
-      <div style="font-size:13px;color:#6b5a4a;margin-top:4px;">${o.delivery_address || 'No address on file'} · ${o.customer_phone}</div>
-      <div style="font-size:13px;margin-top:4px;">${o.order_type} — ${o.quantity} × ${o.cylinder_size}</div>
-      <div style="margin-top:10px;display:flex;gap:8px;">
-        <button class="btn-small mark-out" data-id="${o.id}">Out for delivery</button>
-        <button class="btn-small mark-delivered" data-id="${o.id}">Mark delivered</button>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
 
-  container.querySelectorAll('.mark-out').forEach(btn=>{
-    btn.addEventListener('click', async (e)=>{
-      const id = e.target.dataset.id;
-      await sb.from('orders').update({ status:'Out for Delivery' }).eq('id', id);
-      showToast('Marked out for delivery.');
-      renderDriverDashboard();
+    container.querySelectorAll('.mark-out').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        await sb.from('orders').update({ status:'Out for Delivery' }).eq('id', e.target.dataset.id);
+        showToast('Marked out for delivery.');
+        renderDriverDashboard();
+      });
     });
-  });
-  container.querySelectorAll('.mark-delivered').forEach(btn=>{
-    btn.addEventListener('click', async (e)=>{
-      const id = e.target.dataset.id;
-      await sb.from('orders').update({ status:'Delivered', delivered_at: new Date().toISOString() }).eq('id', id);
-      showToast('Marked delivered.');
-      renderDriverDashboard();
+    container.querySelectorAll('.mark-delivered').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        await sb.from('orders').update({ status:'Delivered', delivered_at: new Date().toISOString() }).eq('id', e.target.dataset.id);
+        showToast('Marked delivered.');
+        renderDriverDashboard();
+      });
     });
+  }
+
+  // Save vehicle stock
+  document.getElementById('save-dstock-btn').addEventListener('click', async ()=>{
+    const inputs = document.querySelectorAll('.dstock-input');
+    const grouped = {};
+    inputs.forEach(i=>{
+      if(!grouped[i.dataset.size]) grouped[i.dataset.size]={full:0,empty:0};
+      grouped[i.dataset.size][i.dataset.type] = parseInt(i.value||'0',10);
+    });
+    for(const [size, counts] of Object.entries(grouped)){
+      const { error } = await sb.from('driver_stock').upsert({
+        driver_id: currentProfile.id,
+        cylinder_size: size,
+        full_count: counts.full,
+        empty_count: counts.empty
+      }, { onConflict: 'driver_id,cylinder_size' });
+      if(error){ showToast('Could not save stock for '+size+': '+error.message, true); return; }
+    }
+    showToast('Vehicle stock saved.');
   });
+
+  // Log empties
+  document.getElementById('log-empty-btn').addEventListener('click', async ()=>{
+    const size = document.getElementById('empty-size').value;
+    const qty = parseInt(document.getElementById('empty-qty').value||'1',10);
+    const note = document.getElementById('empty-note').value.trim();
+    if(!size){ showToast('Select a cylinder size.', true); return; }
+    const { error } = await sb.from('stock_movements').insert({
+      moved_by: currentProfile.id,
+      from_location: 'Customer',
+      to_location: 'Driver Vehicle',
+      cylinder_size: size,
+      empty_qty: qty,
+      note: note || `${qty} x ${size} empties collected`
+    });
+    if(error){ showToast('Could not log empties: '+error.message, true); return; }
+    // Also update driver_stock empty count
+    const existing = (myStock||[]).find(r=>r.cylinder_size===size);
+    await sb.from('driver_stock').upsert({
+      driver_id: currentProfile.id,
+      cylinder_size: size,
+      full_count: existing?.full_count||0,
+      empty_count: (existing?.empty_count||0) + qty
+    }, { onConflict: 'driver_id,cylinder_size' });
+    showToast(`${qty} x ${size} empties logged.`);
+    document.getElementById('empty-size').value='';
+    document.getElementById('empty-qty').value='1';
+    document.getElementById('empty-note').value='';
+    loadEmptiesLog();
+  });
+
+  async function loadEmptiesLog(){
+    const el = document.getElementById('empties-log');
+    if(!el) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const { data, error } = await sb.from('stock_movements')
+      .select('*')
+      .eq('moved_by', currentProfile.id)
+      .eq('from_location','Customer')
+      .gte('created_at', today.toISOString())
+      .order('created_at', { ascending:false });
+    if(error||!data||!data.length){ el.innerHTML=`<div class="empty-state">No empties logged today.</div>`; return; }
+    el.innerHTML=`<table>
+      <thead><tr><th>Time</th><th>Size</th><th>Qty</th><th>Note</th></tr></thead>
+      <tbody>${data.map(r=>`
+        <tr>
+          <td>${new Date(r.created_at).toLocaleTimeString()}</td>
+          <td>${r.cylinder_size}</td>
+          <td>${r.empty_qty}</td>
+          <td>${r.note||''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
 }
 </script>
 </body>
