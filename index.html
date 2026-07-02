@@ -191,9 +191,30 @@
     <div class="who">
       <span id="who-name"></span>
       <span class="role-pill" id="who-role"></span>
+      <div id="notif-bell" style="display:none;position:relative;cursor:pointer;" title="New orders">
+        <span style="font-size:20px;">🔔</span>
+        <span id="notif-count" style="
+          position:absolute;top:-6px;right:-8px;background:var(--ember);color:#fff;
+          border-radius:20px;font-size:10px;font-weight:700;padding:2px 6px;min-width:16px;text-align:center;
+        ">0</span>
+      </div>
       <button id="logout-btn">Log out</button>
     </div>
   </header>
+
+  <!-- NOTIFICATION PANEL -->
+  <div id="notif-panel" style="
+    display:none;position:fixed;top:58px;right:16px;width:320px;max-height:400px;overflow-y:auto;
+    background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 50px -10px rgba(0,0,0,0.2);
+    z-index:100;padding:16px;
+  ">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <strong style="font-size:14px;">New orders</strong>
+      <button id="notif-clear" style="font-size:12px;color:var(--ember);background:none;border:none;cursor:pointer;">Clear all</button>
+    </div>
+    <div id="notif-list"></div>
+  </div>
+
   <main id="main-content">
     <div class="empty-state">Loading…</div>
   </main>
@@ -375,9 +396,79 @@ sb.auth.getSession().then(({ data })=>{
 
 /* ============ ROUTING ============ */
 function routeToDashboard(){
-  if(currentProfile.role === 'admin') renderAdminDashboard();
+  if(currentProfile.role === 'admin'){
+    renderAdminDashboard();
+    startOrderNotifications();
+  }
   else if(currentProfile.role === 'sales') renderSalesDashboard();
   else if(currentProfile.role === 'driver') renderDriverDashboard();
+}
+
+/* ============ REALTIME ORDER NOTIFICATIONS (Admin only) ============ */
+let notifChannel = null;
+let notifications = [];
+
+function startOrderNotifications(){
+  const bell = document.getElementById('notif-bell');
+  if(!bell) return;
+  bell.style.display = 'flex';
+
+  // Toggle panel on bell click
+  bell.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const panel = document.getElementById('notif-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', ()=>{
+    document.getElementById('notif-panel').style.display = 'none';
+  });
+  document.getElementById('notif-clear').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    notifications = [];
+    updateNotifUI();
+  });
+
+  // Subscribe to new orders via Supabase Realtime
+  if(notifChannel) notifChannel.unsubscribe();
+  notifChannel = sb.channel('new-orders')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'orders'
+    }, payload => {
+      const o = payload.new;
+      // Only notify if order was NOT placed by Mike (admin)
+      if(o.created_by === currentProfile.id) return;
+      notifications.unshift({
+        id: o.id,
+        text: `New order #${1000+o.id} — ${o.customer_name} (${o.cylinder_size} ${o.order_type})`,
+        time: new Date().toLocaleTimeString()
+      });
+      updateNotifUI();
+      // Flash the page title
+      document.title = `(${notifications.length}) New Order — Stala's Gas`;
+      setTimeout(()=>{ document.title = "Stala's Gas — Business Manager"; }, 4000);
+    })
+    .subscribe();
+}
+
+function updateNotifUI(){
+  const count = notifications.length;
+  const countEl = document.getElementById('notif-count');
+  const listEl = document.getElementById('notif-list');
+  if(countEl) countEl.textContent = count;
+  const bell = document.getElementById('notif-bell');
+  if(bell) bell.style.opacity = count > 0 ? '1' : '0.4';
+  if(listEl){
+    listEl.innerHTML = count === 0
+      ? `<div class="empty-state" style="padding:10px 0;">No new orders yet.</div>`
+      : notifications.map(n=>`
+          <div style="padding:10px 0;border-bottom:1px solid var(--line);">
+            <div style="font-size:13px;font-weight:600;">${n.text}</div>
+            <div style="font-size:11px;color:#8a7565;margin-top:2px;">${n.time}</div>
+          </div>
+        `).join('');
+  }
 }
 
 /* ============ SHARED: ORDER FORM ============ */
@@ -647,7 +738,7 @@ async function renderAdminDashboard(){
     <div class="tab-content" id="tab-staff" style="display:none;">
       <div class="panel">
         <h2>Add staff member</h2>
-        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Create a login for a driver or sales person. They sign in with their name + 4-digit PIN.</p>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Add any driver or sales person — as many as you need. They sign in by selecting their name + entering their 4-digit PIN. No email required.</p>
         <div class="form-grid">
           <div><label>Full name</label><input id="new-staff-name" placeholder="e.g. Chris"></div>
           <div>
