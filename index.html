@@ -507,6 +507,25 @@ function wireOrderForm(onSaved){
   const qtyEl = document.getElementById('f-qty');
   const amountEl = document.getElementById('f-amount');
   const typeEl = document.getElementById('f-type');
+  const phoneEl = document.getElementById('f-phone');
+  const nameEl = document.getElementById('f-name');
+  const addressEl = document.getElementById('f-address');
+
+  // Customer auto-fill by phone
+  let phoneTimer;
+  phoneEl.addEventListener('input', ()=>{
+    clearTimeout(phoneTimer);
+    const phone = phoneEl.value.trim();
+    if(phone.length < 7) return;
+    phoneTimer = setTimeout(async ()=>{
+      const { data } = await sb.from('customers').select('*').eq('phone', phone).maybeSingle();
+      if(data){
+        nameEl.value = data.name;
+        addressEl.value = data.address || '';
+        showToast(`Returning customer: ${data.name}`);
+      }
+    }, 500);
+  });
 
   function autoFillAmount(){
     const size = sizeEl.value;
@@ -716,6 +735,7 @@ async function renderAdminDashboard(){
       <button class="tab-btn active" data-tab="orders">Orders</button>
       <button class="tab-btn" data-tab="customers">Customers</button>
       <button class="tab-btn" data-tab="reports">Reports</button>
+      <button class="tab-btn" data-tab="recon">Reconciliation</button>
       <button class="tab-btn" data-tab="prices">Prices</button>
       <button class="tab-btn" data-tab="stock">Stock</button>
       <button class="tab-btn" data-tab="staff">Staff</button>
@@ -726,6 +746,13 @@ async function renderAdminDashboard(){
       <div class="panel">
         <h2>All orders</h2>
         <div id="orders-table"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-recon" style="display:none;">
+      <div class="panel">
+        <h2>Driver reconciliation reports</h2>
+        <div id="recon-list"><div class="empty-state">Loading…</div></div>
       </div>
     </div>
 
@@ -823,6 +850,7 @@ async function renderAdminDashboard(){
       if(btn.dataset.tab === 'reports') renderReports(orders);
       if(btn.dataset.tab === 'customers') wireCustomerSearch();
       if(btn.dataset.tab === 'staff') loadStaffList();
+      if(btn.dataset.tab === 'recon') loadReconciliations();
     });
   });
 
@@ -939,6 +967,42 @@ async function renderAdminDashboard(){
     showToast('Stock updated.');
     renderAdminDashboard();
   });
+}
+
+/* ============ RECONCILIATION (Admin view) ============ */
+async function loadReconciliations(){
+  const el = document.getElementById('recon-list');
+  if(!el) return;
+  el.innerHTML = `<div class="empty-state">Loading…</div>`;
+  const { data, error } = await sb.from('reconciliations')
+    .select('*')
+    .order('created_at', { ascending:false })
+    .limit(50);
+  if(error){ el.innerHTML=`<div class="empty-state">Could not load: ${error.message}</div>`; return; }
+  if(!data.length){ el.innerHTML=`<div class="empty-state">No reports submitted yet.</div>`; return; }
+  el.innerHTML=`
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Driver</th><th>Deliveries</th><th>Cash</th><th>EFT</th><th>Total</th><th>Loaded</th><th>Returned</th><th>Empties</th><th>Notes</th>
+      </tr></thead>
+      <tbody>
+        ${data.map(r=>`
+          <tr>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td>${r.driver_name}</td>
+            <td>${r.deliveries_made}</td>
+            <td>R${parseFloat(r.cash_collected||0).toFixed(2)}</td>
+            <td>R${parseFloat(r.eft_collected||0).toFixed(2)}</td>
+            <td><strong>R${(parseFloat(r.cash_collected||0)+parseFloat(r.eft_collected||0)).toFixed(2)}</strong></td>
+            <td>${r.full_loaded}</td>
+            <td>${r.full_returned}</td>
+            <td>${r.empties_collected}</td>
+            <td style="font-size:12px;color:#8a7565;">${r.notes||'—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 /* ============ REPORTS ============ */
@@ -1177,6 +1241,7 @@ async function renderDriverDashboard(){
       <button class="tab-btn active" data-tab="d-deliveries">Deliveries</button>
       <button class="tab-btn" data-tab="d-stock">My Stock</button>
       <button class="tab-btn" data-tab="d-empties">Empties</button>
+      <button class="tab-btn" data-tab="d-recon">End of Day</button>
     </div>
 
     <!-- DELIVERIES TAB -->
@@ -1235,6 +1300,23 @@ async function renderDriverDashboard(){
       <div class="panel">
         <h2>Today's empties log</h2>
         <div id="empties-log"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+    <!-- END OF DAY TAB -->
+    <div class="tab-content" id="tab-d-recon" style="display:none;">
+      <div class="panel">
+        <h2>End of day report</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Submit this before you finish for the day.</p>
+        <div class="form-grid">
+          <div><label>Deliveries made</label><input id="r-deliveries" type="number" min="0" value="${orders.length}"></div>
+          <div><label>Cash collected (R)</label><input id="r-cash" type="number" min="0" step="0.01" value="0.00"></div>
+          <div><label>EFT collected (R)</label><input id="r-eft" type="number" min="0" step="0.01" value="0.00"></div>
+          <div><label>Full cylinders loaded today</label><input id="r-loaded" type="number" min="0" value="0"></div>
+          <div><label>Full cylinders returned</label><input id="r-returned" type="number" min="0" value="0"></div>
+          <div><label>Empty cylinders collected</label><input id="r-empties" type="number" min="0" value="0"></div>
+          <div class="full"><label>Notes</label><input id="r-notes" placeholder="Anything to report to Mike…"></div>
+        </div>
+        <button class="primary" id="submit-recon-btn" style="margin-top:14px;max-width:220px;">Submit report</button>
       </div>
     </div>
   `;
@@ -1336,6 +1418,40 @@ async function renderDriverDashboard(){
     document.getElementById('empty-qty').value='1';
     document.getElementById('empty-note').value='';
     loadEmptiesLog();
+  });
+
+  // Submit end of day reconciliation
+  document.getElementById('submit-recon-btn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('submit-recon-btn');
+    btn.disabled=true; btn.textContent='Submitting…';
+    const { error } = await sb.from('reconciliations').insert({
+      driver_id: currentProfile.id,
+      driver_name: currentProfile.full_name,
+      deliveries_made: parseInt(document.getElementById('r-deliveries').value||'0'),
+      cash_collected: parseFloat(document.getElementById('r-cash').value||'0'),
+      eft_collected: parseFloat(document.getElementById('r-eft').value||'0'),
+      full_loaded: parseInt(document.getElementById('r-loaded').value||'0'),
+      full_returned: parseInt(document.getElementById('r-returned').value||'0'),
+      empties_collected: parseInt(document.getElementById('r-empties').value||'0'),
+      notes: document.getElementById('r-notes').value.trim()
+    });
+    btn.disabled=false; btn.textContent='Submit report';
+    if(error){ showToast('Could not submit: '+error.message, true); return; }
+    showToast('End of day report submitted. Good work today!');
+    // Send WhatsApp summary to Mike
+    const cash = parseFloat(document.getElementById('r-cash').value||'0');
+    const eft = parseFloat(document.getElementById('r-eft').value||'0');
+    const waMsg = encodeURIComponent(
+      `End of Day Report — ${currentProfile.full_name}\n` +
+      `Date: ${new Date().toLocaleDateString()}\n` +
+      `Deliveries: ${document.getElementById('r-deliveries').value}\n` +
+      `Cash: R${cash.toFixed(2)} | EFT: R${eft.toFixed(2)}\n` +
+      `Total collected: R${(cash+eft).toFixed(2)}\n` +
+      `Full loaded: ${document.getElementById('r-loaded').value} | Returned: ${document.getElementById('r-returned').value}\n` +
+      `Empties: ${document.getElementById('r-empties').value}\n` +
+      `Notes: ${document.getElementById('r-notes').value||'None'}`
+    );
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${waMsg}`, '_blank');
   });
 
   async function loadEmptiesLog(){
