@@ -167,6 +167,26 @@
   }
   .tab-btn:hover{color:var(--char);}
   .tab-btn.active{color:var(--ember-deep);border-bottom-color:var(--ember);}
+
+  /* INVOICE MODAL */
+  #invoice-modal{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  #invoice-modal.open{display:flex;}
+  #invoice-inner{
+    background:#fff;border-radius:16px;padding:32px 28px;max-width:480px;width:100%;
+    max-height:90vh;overflow-y:auto;position:relative;
+  }
+  #invoice-close{
+    position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#8a7565;
+  }
+  @media print{
+    body > *:not(#invoice-modal){ display:none !important; }
+    #invoice-modal{ position:static;background:none;padding:0;display:block !important; }
+    #invoice-inner{ box-shadow:none;border-radius:0;max-height:none; }
+    #invoice-close, #invoice-print-btn{ display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -253,6 +273,15 @@
   <main id="main-content">
     <div class="empty-state">Loading…</div>
   </main>
+
+  <!-- INVOICE MODAL -->
+  <div id="invoice-modal">
+    <div id="invoice-inner">
+      <button id="invoice-close">✕</button>
+      <div id="invoice-content"></div>
+      <button class="primary" id="invoice-print-btn" style="margin-top:20px;max-width:200px;">🖨 Print / Save PDF</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -292,6 +321,56 @@ function showToast(msg, isError=false){
   t.style.display = 'block';
   setTimeout(()=> t.style.display='none', 3200);
 }
+
+/* ============ INVOICE / RECEIPT ============ */
+function showInvoice(order){
+  const modal = document.getElementById('invoice-modal');
+  const content = document.getElementById('invoice-content');
+  const orderNum = 1000 + order.id;
+  const date = new Date(order.created_at).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'});
+  content.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:28px;">🔥</div>
+      <h2 style="font-family:var(--font-display);margin:4px 0;font-size:22px;">Stala's Gas</h2>
+      <div style="font-size:12px;color:#8a7565;">Cape Town · 072 574 4458 · info@stala.co.za</div>
+    </div>
+    <div style="border-top:2px solid var(--char);border-bottom:2px solid var(--char);padding:10px 0;margin:16px 0;display:flex;justify-content:space-between;">
+      <div><strong>Receipt #${orderNum}</strong></div>
+      <div style="color:#8a7565;">${date}</div>
+    </div>
+    <table style="width:100%;font-size:14px;">
+      <tr><td style="padding:5px 0;color:#8a7565;">Customer</td><td style="text-align:right;">${order.customer_name}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Phone</td><td style="text-align:right;">${order.customer_phone}</td></tr>
+      ${order.delivery_address?`<tr><td style="padding:5px 0;color:#8a7565;">Address</td><td style="text-align:right;">${order.delivery_address}</td></tr>`:''}
+      <tr><td colspan="2"><hr style="border:none;border-top:1px solid var(--line);margin:8px 0;"></td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Order type</td><td style="text-align:right;">${order.order_type}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Cylinder size</td><td style="text-align:right;">${order.cylinder_size}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Quantity</td><td style="text-align:right;">${order.quantity}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Payment</td><td style="text-align:right;">${order.payment_method||'—'}</td></tr>
+      ${order.delivery_notes?`<tr><td style="padding:5px 0;color:#8a7565;">Notes</td><td style="text-align:right;font-size:12px;">${order.delivery_notes}</td></tr>`:''}
+      <tr><td colspan="2"><hr style="border:none;border-top:2px solid var(--char);margin:8px 0;"></td></tr>
+      <tr>
+        <td style="font-size:18px;font-weight:700;">TOTAL</td>
+        <td style="text-align:right;font-size:18px;font-weight:700;color:var(--ember-deep);">R${parseFloat(order.amount||0).toFixed(2)}</td>
+      </tr>
+    </table>
+    <div style="text-align:center;margin-top:20px;font-size:12px;color:#8a7565;">
+      Thank you for choosing Stala's Gas!
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('invoice-close')?.addEventListener('click', ()=>{
+    document.getElementById('invoice-modal').classList.remove('open');
+  });
+  document.getElementById('invoice-print-btn')?.addEventListener('click', ()=>window.print());
+  document.getElementById('invoice-modal')?.addEventListener('click', (e)=>{
+    if(e.target === document.getElementById('invoice-modal'))
+      document.getElementById('invoice-modal').classList.remove('open');
+  });
+});
 
 /* ============ AUTH ============ */
 
@@ -517,6 +596,7 @@ function orderFormHTML(){
       <div><label>Customer name</label><input id="f-name" placeholder="e.g. Thandi Nkosi"></div>
       <div><label>Phone number</label><input id="f-phone" placeholder="e.g. 0821234567"></div>
       <div class="full"><label>Delivery address</label><input id="f-address" placeholder="e.g. 12 Voortrekker Rd, Bellville"></div>
+      <div class="full"><label>Delivery notes <span style="font-weight:400;color:#8a7565;">(gate code, special instructions…)</span></label><input id="f-notes" placeholder="e.g. Green gate, ring bell twice"></div>
       <div>
         <label>Order type</label>
         <select id="f-type"><option value="">Select</option>${ORDER_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
@@ -600,6 +680,7 @@ function wireOrderForm(onSaved){
     const name = document.getElementById('f-name').value.trim();
     const phone = document.getElementById('f-phone').value.trim();
     const address = document.getElementById('f-address').value.trim();
+    const notes = document.getElementById('f-notes')?.value.trim() || '';
     const type = document.getElementById('f-type').value;
     const size = document.getElementById('f-size').value;
     const qty = parseInt(document.getElementById('f-qty').value || '1', 10);
@@ -626,6 +707,7 @@ function wireOrderForm(onSaved){
       customer_name: name,
       customer_phone: phone,
       delivery_address: address,
+      delivery_notes: notes || null,
       order_type: type,
       cylinder_size: size,
       quantity: qty,
@@ -792,6 +874,10 @@ async function renderAdminDashboard(){
       <div class="stat-card"><div class="num">${totalOrders}</div><div class="label">Total orders</div></div>
       <div class="stat-card"><div class="num">R${totalRevenue.toFixed(2)}</div><div class="label">Total revenue</div></div>
       <div class="stat-card"><div class="num">${pending}</div><div class="label">Pending orders</div></div>
+      <div class="stat-card" style="${orders.filter(o=>!o.is_paid&&o.status!=='Cancelled').length>0?'border-color:var(--warn);':''}" >
+        <div class="num" style="color:var(--warn);">${orders.filter(o=>!o.is_paid&&o.status!=='Cancelled').length}</div>
+        <div class="label">Unpaid orders</div>
+      </div>
     </div>
 
     <div class="tab-nav">
@@ -844,6 +930,11 @@ async function renderAdminDashboard(){
 
     <div class="tab-content" id="tab-reports" style="display:none;">
       <div id="reports-content"><div class="empty-state">Loading reports…</div></div>
+      <div class="panel" style="margin-top:0;">
+        <h2>Daily summary</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Send yesterday's order summary to your WhatsApp.</p>
+        <button class="primary" id="daily-summary-btn" style="max-width:240px;background:#25D366;">📲 Send yesterday's summary</button>
+      </div>
     </div>
 
     <div class="tab-content" id="tab-staff" style="display:none;">
@@ -1023,7 +1114,35 @@ async function renderAdminDashboard(){
       document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).style.display='block';
-      if(btn.dataset.tab === 'reports') renderReports(orders);
+      if(btn.dataset.tab === 'reports'){
+        renderReports(orders);
+        setTimeout(()=>{
+          document.getElementById('daily-summary-btn')?.addEventListener('click', async ()=>{
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1); yesterday.setHours(0,0,0,0);
+            const endOfYesterday = new Date(yesterday); endOfYesterday.setHours(23,59,59,999);
+            const { data: yOrders } = await sb.from('orders').select('*')
+              .gte('created_at', yesterday.toISOString())
+              .lte('created_at', endOfYesterday.toISOString());
+            if(!yOrders||!yOrders.length){ showToast('No orders from yesterday.', true); return; }
+            const totalRev = yOrders.reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const cash = yOrders.filter(o=>o.payment_method==='Cash').reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const eft = yOrders.filter(o=>o.payment_method==='EFT').reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const delivered = yOrders.filter(o=>o.status==='Delivered').length;
+            const msg = encodeURIComponent(
+              `📊 Stala's Gas — Daily Summary\n` +
+              `Date: ${yesterday.toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}\n\n` +
+              `Total orders: ${yOrders.length}\n` +
+              `Delivered: ${delivered}\n` +
+              `Pending: ${yOrders.filter(o=>o.status==='Pending').length}\n\n` +
+              `💰 Revenue: R${totalRev.toFixed(2)}\n` +
+              `Cash: R${cash.toFixed(2)}\n` +
+              `EFT: R${eft.toFixed(2)}\n\n` +
+              `Top sizes: ${[...new Set(yOrders.map(o=>o.cylinder_size))].join(', ')}`
+            );
+            window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+          });
+        }, 100);
+      }
       if(btn.dataset.tab === 'customers') wireCustomerSearch();
       if(btn.dataset.tab === 'staff') loadStaffList();
       if(btn.dataset.tab === 'recon') loadReconciliations();
@@ -1380,6 +1499,8 @@ function renderOrdersTable(orders, canManage, drivers){
             <td>
               <span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span>
               ${o.cancelled_reason?`<div style="font-size:11px;color:var(--danger);margin-top:2px;text-decoration:none;">${o.cancelled_reason}</div>`:''}
+              ${o.is_paid?`<div style="font-size:11px;color:var(--ok);margin-top:2px;">✓ Paid</div>`:`<div style="font-size:11px;color:var(--warn);margin-top:2px;">⚠ Unpaid</div>`}
+              ${o.delivery_notes?`<div style="font-size:11px;color:#8a7565;margin-top:2px;">📌 ${o.delivery_notes}</div>`:''}
             </td>
             ${canManage ? `<td>
               <select class="status-select" data-id="${o.id}" ${o.status==='Cancelled'?'disabled':''}>
@@ -1395,6 +1516,8 @@ function renderOrdersTable(orders, canManage, drivers){
             <td style="white-space:nowrap;">
               ${o.status!=='Cancelled'?`
                 <a href="https://wa.me/${o.customer_phone.replace(/^0/,'27')}?text=${encodeURIComponent(`Hi ${o.customer_name}, regarding your Stala's Gas order #${1000+o.id} (${o.quantity} x ${o.cylinder_size} ${o.order_type}).`)}" target="_blank" class="btn-small" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;display:inline-block;margin-bottom:4px;">💬 WhatsApp</a>
+                <button class="btn-small invoice-btn" data-id="${o.id}" style="display:block;margin-bottom:4px;">🧾 Invoice</button>
+                ${!o.is_paid?`<button class="btn-small mark-paid-btn" data-id="${o.id}" style="color:var(--ok);border-color:var(--ok);display:block;margin-bottom:4px;">✓ Mark paid</button>`:''}
                 <button class="btn-small cancel-order" data-id="${o.id}" data-num="${1000+o.id}" style="color:var(--danger);border-color:var(--danger);display:block;">✕ Cancel</button>
               `:'<span style="font-size:11px;color:#aaa;">Cancelled</span>'}
             </td>` : ''}
@@ -1423,6 +1546,22 @@ function renderOrdersTable(orders, canManage, drivers){
         const { error } = await sb.from('orders').update(updates).eq('id', id);
         if(error){ showToast('Could not assign driver: ' + error.message, true); }
         else showToast(`Order #${1000+parseInt(id)} assigned.`);
+      });
+    });
+    container.querySelectorAll('.invoice-btn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const order = orders.find(o=>o.id==id);
+        if(order) showInvoice(order);
+      });
+    });
+    container.querySelectorAll('.mark-paid-btn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const { error } = await sb.from('orders').update({ is_paid: true, paid_at: new Date().toISOString() }).eq('id', id);
+        if(error){ showToast('Could not mark paid: '+error.message, true); return; }
+        showToast('Order marked as paid.');
+        renderAdminDashboard();
       });
     });
     container.querySelectorAll('.cancel-order').forEach(btn=>{
@@ -1612,6 +1751,7 @@ async function renderDriverDashboard(){
         </div>
         <div style="font-size:13px;color:#6b5a4a;margin-top:4px;">${o.delivery_address||'No address'} · ${o.customer_phone}</div>
         <div style="font-size:13px;margin-top:4px;">${o.order_type} — ${o.quantity} × ${o.cylinder_size}</div>
+        ${o.delivery_notes?`<div style="font-size:12px;background:#fff9ec;border:1px solid var(--warn);border-radius:6px;padding:5px 8px;margin-top:6px;">📌 ${o.delivery_notes}</div>`:''}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn-small mark-out" data-id="${o.id}">Out for delivery</button>
           <button class="btn-small mark-delivered" data-id="${o.id}">Mark delivered</button>
