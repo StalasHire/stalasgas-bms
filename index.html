@@ -1251,8 +1251,11 @@ function renderOrdersTable(orders, canManage, drivers){
                 ${drivers.map(d=>`<option value="${d.id}" ${o.assigned_driver===d.id?'selected':''}>${d.full_name}</option>`).join('')}
               </select>
             </td>
-            <td>
-              ${o.status!=='Cancelled'?`<button class="btn-small cancel-order" data-id="${o.id}" data-num="${1000+o.id}" style="color:var(--danger);border-color:var(--danger);">✕ Cancel</button>`:'<span style="font-size:11px;color:#aaa;">Cancelled</span>'}
+            <td style="white-space:nowrap;">
+              ${o.status!=='Cancelled'?`
+                <a href="https://wa.me/${o.customer_phone.replace(/^0/,'27')}?text=${encodeURIComponent(`Hi ${o.customer_name}, regarding your Stala's Gas order #${1000+o.id} (${o.quantity} x ${o.cylinder_size} ${o.order_type}).`)}" target="_blank" class="btn-small" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;display:inline-block;margin-bottom:4px;">💬 WhatsApp</a>
+                <button class="btn-small cancel-order" data-id="${o.id}" data-num="${1000+o.id}" style="color:var(--danger);border-color:var(--danger);display:block;">✕ Cancel</button>
+              `:'<span style="font-size:11px;color:#aaa;">Cancelled</span>'}
             </td>` : ''}
           </tr>
         `).join('')}
@@ -1471,8 +1474,6 @@ async function renderDriverDashboard(){
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn-small mark-out" data-id="${o.id}">Out for delivery</button>
           <button class="btn-small mark-delivered" data-id="${o.id}">Mark delivered</button>
-          <a href="https://wa.me/${o.customer_phone.replace(/^0/,'27')}?text=${encodeURIComponent(`Hi ${o.customer_name}, your Stala's Gas order #${1000+o.id} is on its way! (${o.quantity} x ${o.cylinder_size} ${o.order_type})`)}"
-            target="_blank" class="btn-small" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;">WhatsApp customer</a>
         </div>
       </div>
     `).join('');
