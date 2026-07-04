@@ -6,6 +6,7 @@
 <title>Stala's Gas — Business Manager</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
   :root{
     --ember:#d9590c;
@@ -557,6 +558,27 @@ function wireOrderForm(onSaved){
         nameEl.value = data.name;
         addressEl.value = data.address || '';
         showToast(`Returning customer: ${data.name}`);
+        // Show last 3 orders
+        const { data: history } = await sb.from('orders')
+          .select('*').eq('customer_phone', phone)
+          .order('created_at',{ascending:false}).limit(3);
+        let histBox = document.getElementById('cust-history-box');
+        if(!histBox){
+          histBox = document.createElement('div');
+          histBox.id = 'cust-history-box';
+          histBox.style.cssText = 'background:var(--sand);border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:10px;font-size:13px;';
+          document.getElementById('save-order-btn')?.parentElement?.insertBefore(histBox, document.getElementById('save-order-btn'));
+        }
+        if(history && history.length){
+          histBox.innerHTML = `<strong style="font-size:12px;color:#8a7565;text-transform:uppercase;letter-spacing:0.5px;">Last ${history.length} order(s)</strong>` +
+            history.map(o=>`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line);">
+              #${1000+o.id} — ${o.order_type} ${o.cylinder_size} × ${o.quantity} — R${parseFloat(o.amount||0).toFixed(2)}
+              <span class="status-pill status-${o.status.replace(/\s/g,'')}" style="margin-left:6px;">${o.status}</span>
+              <span style="color:#aaa;font-size:11px;margin-left:6px;">${new Date(o.created_at).toLocaleDateString()}</span>
+            </div>`).join('');
+        } else {
+          histBox.innerHTML = `<span style="color:#8a7565;">No previous orders for this customer.</span>`;
+        }
       }
     }, 500);
   });
@@ -758,7 +780,14 @@ async function renderAdminDashboard(){
   const totalRevenue = orders.reduce((sum,o)=> sum + (parseFloat(o.amount)||0), 0);
   const pending = orders.filter(o=>o.status==='Pending').length;
 
+  const lowStock = (stockRows||[]).filter(r => r.full_count < r.low_stock_threshold);
+
   main.innerHTML = `
+    ${lowStock.length ? `
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
+      ⚠️ <strong>Low stock alert:</strong>
+      ${lowStock.map(r=>`${r.location} — ${r.cylinder_size}: only ${r.full_count} left`).join(' &nbsp;|&nbsp; ')}
+    </div>` : ''}
     <div class="stat-row">
       <div class="stat-card"><div class="num">${totalOrders}</div><div class="label">Total orders</div></div>
       <div class="stat-card"><div class="num">R${totalRevenue.toFixed(2)}</div><div class="label">Total revenue</div></div>
@@ -788,6 +817,15 @@ async function renderAdminDashboard(){
           </select>
           <button id="export-csv-btn" class="btn-small" style="white-space:nowrap;">⬇ Export CSV</button>
           <button id="print-btn" class="btn-small" style="white-space:nowrap;">🖨 Print / PDF</button>
+        </div>
+        <div id="bulk-dispatch-bar" style="display:none;background:var(--sand);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span id="bulk-count" style="font-size:13px;font-weight:600;"></span>
+          <select id="bulk-driver-select" style="min-width:160px;">
+            <option value="">Assign driver…</option>
+            ${(drivers||[]).map(d=>`<option value="${d.id}">${d.full_name}</option>`).join('')}
+          </select>
+          <button id="bulk-assign-btn" class="primary" style="max-width:160px;padding:8px 16px;">Assign all selected</button>
+          <button id="bulk-clear-btn" class="btn-small">Clear selection</button>
         </div>
         <div id="orders-table"></div>
       </div>
@@ -860,7 +898,7 @@ async function renderAdminDashboard(){
     <div class="tab-content" id="tab-stock" style="display:none;">
       <div class="panel">
         <h2>Stock levels</h2>
-        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Full cylinders on hand at each location. Update and click Save stock — every change is logged.</p>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Full cylinders on hand. Set "Alert at" threshold — highlighted in yellow when stock is low.</p>
         <div style="overflow-x:auto;">
         <table>
           <thead><tr><th>Location</th>${CYL_SIZES.map(s=>`<th>${s}</th>`).join('')}</tr></thead>
@@ -871,7 +909,12 @@ async function renderAdminDashboard(){
                 ${CYL_SIZES.map(size=>{
                   const row = (stockRows||[]).find(r=>r.location===loc && r.cylinder_size===size);
                   const val = row ? row.full_count : 0;
-                  return `<td><input type="number" min="0" class="stock-input" data-location="${loc}" data-size="${size}" value="${val}" style="width:70px;padding:6px 8px;"></td>`;
+                  const threshold = row ? (row.low_stock_threshold||5) : 5;
+                  const isLow = val < threshold;
+                  return `<td>
+                    <input type="number" min="0" class="stock-input" data-location="${loc}" data-size="${size}" value="${val}" style="width:68px;padding:5px 6px;${isLow?'border-color:var(--warn);background:#fff9ec;':''}">
+                    <div style="font-size:10px;color:#8a7565;margin-top:3px;">Alert≤<input type="number" min="0" class="threshold-input" data-location="${loc}" data-size="${size}" value="${threshold}" style="width:36px;padding:2px 4px;font-size:10px;border:1px solid var(--line);border-radius:4px;"></div>
+                  </td>`;
                 }).join('')}
               </tr>
             `).join('')}
@@ -887,6 +930,20 @@ async function renderAdminDashboard(){
 
   // Order search + filter (client-side)
   let allOrders = orders;
+  let selectedOrderIds = new Set();
+
+  function updateBulkBar(){
+    const bar = document.getElementById('bulk-dispatch-bar');
+    const countEl = document.getElementById('bulk-count');
+    if(!bar) return;
+    if(selectedOrderIds.size > 0){
+      bar.style.display = 'flex';
+      countEl.textContent = `${selectedOrderIds.size} order(s) selected`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
   function applyOrderFilters(){
     const q = (document.getElementById('order-search')?.value||'').toLowerCase();
     const status = document.getElementById('order-status-filter')?.value||'';
@@ -898,12 +955,47 @@ async function renderAdminDashboard(){
     renderOrdersTable(filtered, true, drivers||[]);
     rewireFilters();
   }
+
   function rewireFilters(){
     document.getElementById('order-search')?.addEventListener('input', applyOrderFilters);
     document.getElementById('order-status-filter')?.addEventListener('change', applyOrderFilters);
     document.getElementById('export-csv-btn')?.addEventListener('click', exportCSV);
     document.getElementById('print-btn')?.addEventListener('click', ()=>window.print());
+    document.getElementById('select-all-orders')?.addEventListener('change', (e)=>{
+      document.querySelectorAll('.order-checkbox:not(:disabled)').forEach(cb=>{
+        cb.checked = e.target.checked;
+        const id = cb.dataset.id;
+        if(e.target.checked) selectedOrderIds.add(id);
+        else selectedOrderIds.delete(id);
+      });
+      updateBulkBar();
+    });
+    // Wire checkboxes for bulk select
+    document.querySelectorAll('.order-checkbox').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const id = cb.dataset.id;
+        if(cb.checked) selectedOrderIds.add(id);
+        else selectedOrderIds.delete(id);
+        updateBulkBar();
+      });
+    });
+    document.getElementById('bulk-assign-btn')?.addEventListener('click', async ()=>{
+      const driverId = document.getElementById('bulk-driver-select')?.value;
+      if(!driverId){ showToast('Select a driver first.', true); return; }
+      for(const id of selectedOrderIds){
+        await sb.from('orders').update({ assigned_driver: driverId, status:'Assigned' }).eq('id', id);
+      }
+      showToast(`${selectedOrderIds.size} orders assigned.`);
+      selectedOrderIds.clear();
+      renderAdminDashboard();
+    });
+    document.getElementById('bulk-clear-btn')?.addEventListener('click', ()=>{
+      selectedOrderIds.clear();
+      document.querySelectorAll('.order-checkbox').forEach(cb=>cb.checked=false);
+      updateBulkBar();
+    });
   }
+
   rewireFilters();
 
   // CSV export
@@ -1048,9 +1140,11 @@ async function renderAdminDashboard(){
       const newFull = parseInt(i.value || '0', 10);
       const existing = (stockRows||[]).find(r=>r.location===location && r.cylinder_size===size);
       const oldFull = existing ? existing.full_count : 0;
+      const thresholdEl = document.querySelector(`.threshold-input[data-location="${location}"][data-size="${size}"]`);
+      const threshold = thresholdEl ? parseInt(thresholdEl.value||'5',10) : 5;
 
       const { error } = await sb.from('stock')
-        .upsert({ location, cylinder_size: size, full_count: newFull, empty_count: existing?.empty_count || 0 }, { onConflict: 'location,cylinder_size' });
+        .upsert({ location, cylinder_size: size, full_count: newFull, empty_count: existing?.empty_count || 0, low_stock_threshold: threshold }, { onConflict: 'location,cylinder_size' });
       if(error){ showToast(`Could not save stock for ${location} ${size}: ${error.message}`, true); return; }
 
       if(newFull !== oldFull){
@@ -1161,6 +1255,11 @@ function renderReports(orders){
       <div class="stat-card"><div class="num">R${rev(monthOrders).toFixed(2)}</div><div class="label">Revenue this month</div></div>
     </div>
 
+    <div class="panel">
+      <h2>Revenue — last 7 days</h2>
+      <canvas id="revenue-chart" height="100"></canvas>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;">
       <div class="panel">
         <h2>By order type</h2>
@@ -1213,6 +1312,46 @@ function renderReports(orders){
       </table>` : `<div class="empty-state">No orders yet.</div>`}
     </div>
   `;
+
+  // Build 7-day chart data
+  const days = [];
+  const dayRevenue = [];
+  const dayLabels = [];
+  for(let i=6;i>=0;i--){
+    const d = new Date(now);
+    d.setDate(d.getDate()-i);
+    d.setHours(0,0,0,0);
+    const nextD = new Date(d); nextD.setDate(nextD.getDate()+1);
+    const dayOrds = orders.filter(o=>{
+      const t = new Date(o.created_at);
+      return t >= d && t < nextD;
+    });
+    dayRevenue.push(rev(dayOrds));
+    dayLabels.push(d.toLocaleDateString('en-ZA',{weekday:'short',day:'numeric'}));
+  }
+  const ctx = document.getElementById('revenue-chart')?.getContext('2d');
+  if(ctx){
+    new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels: dayLabels,
+        datasets:[{
+          label:'Revenue (R)',
+          data: dayRevenue,
+          backgroundColor:'rgba(217,89,12,0.7)',
+          borderColor:'rgba(185,67,10,1)',
+          borderWidth:1,
+          borderRadius:6
+        }]
+      },
+      options:{
+        plugins:{ legend:{ display:false } },
+        scales:{
+          y:{ beginAtZero:true, ticks:{ callback: v=>'R'+v } }
+        }
+      }
+    });
+  }
 }
 
 /* ============ ORDERS TABLE ============ */
@@ -1224,11 +1363,13 @@ function renderOrdersTable(orders, canManage, drivers){
     <div style="overflow-x:auto;">
     <table>
       <thead><tr>
+        ${canManage?'<th><input type="checkbox" id="select-all-orders" title="Select all"></th>':''}
         <th>ID</th><th>Customer</th><th>Phone</th><th>Type</th><th>Cylinder</th><th>Qty</th><th>Amount</th><th>Status</th>${canManage?'<th>Action</th><th>Driver</th><th></th>':''}
       </tr></thead>
       <tbody>
         ${orders.map(o=>`
           <tr data-id="${o.id}" style="${o.status==='Cancelled'?'opacity:0.5;text-decoration:line-through;':''}">
+            ${canManage?`<td><input type="checkbox" class="order-checkbox" data-id="${o.id}" ${o.status==='Cancelled'?'disabled':''}></td>`:''}
             <td>#${1000+o.id}</td>
             <td>${o.customer_name}</td>
             <td>${o.customer_phone}</td>
