@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stala's Gas — Business Manager</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ember:#d9590c;
+    --ember-deep:#b9430a;
+    --char:#241712;
+    --char-soft:#3a2a22;
+    --cream:#fbf2e6;
+    --sand:#f0e1ca;
+    --line:#e3cba8;
+    --ok:#3f7d4f;
+    --warn:#c98a1c;
+    --danger:#b23a2e;
+    --font-display:'Iowan Old Style','Georgia',serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:var(--font-body);background:var(--cream);color:var(--char);
+    min-height:100vh;
+  }
+  .flame{font-size:1.1em;}
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 30% 20%, #fff7ec 0%, var(--cream) 55%, var(--sand) 100%);
+    padding:24px;
+  }
+  .login-card{
+    background:#fff;border:1px solid var(--line);border-radius:18px;
+    padding:40px 36px;max-width:380px;width:100%;
+    box-shadow:0 20px 50px -20px rgba(36,23,18,0.25);
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .brand-mark{
+    width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,var(--ember),var(--ember-deep));
+    display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;
+  }
+  .brand h1{font-family:var(--font-display);font-size:21px;margin:0;letter-spacing:0.3px;}
+  .brand small{display:block;color:var(--char-soft);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+  .login-card h2{font-family:var(--font-display);font-size:17px;margin:24px 0 4px;color:var(--char-soft);font-weight:600;}
+  .login-card p.sub{font-size:13px;color:#8a7565;margin:0 0 20px;}
+  label{font-size:12px;font-weight:600;color:var(--char-soft);display:block;margin-bottom:5px;letter-spacing:0.3px;}
+  input{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;
+    font-size:14px;margin-bottom:14px;background:#fffdfa;color:var(--char);
+  }
+  input:focus{outline:2px solid var(--ember);outline-offset:1px;border-color:var(--ember);}
+  button.primary{
+    width:100%;padding:12px;border:none;border-radius:9px;background:var(--ember);
+    color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.2px;
+    transition:background .15s ease;
+  }
+  button.primary:hover{background:var(--ember-deep);}
+  button.primary:disabled{opacity:0.55;cursor:default;}
+  #login-error{color:var(--danger);font-size:13px;margin-top:10px;display:none;}
+  .login-tabs{display:flex;gap:0;margin:18px 0 16px;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .login-tab{flex:1;padding:9px;border:none;background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:#8a7565;}
+  .login-tab.active{background:var(--ember);color:#fff;}
+  .pin-row{display:flex;gap:10px;margin-top:6px;}
+  .pin-box{width:52px;height:58px;text-align:center;font-size:22px;font-weight:700;border:2px solid var(--line);border-radius:10px;padding:0;}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none;min-height:100vh;}
+  header.topbar{
+    background:var(--char);color:var(--sand);display:flex;align-items:center;
+    justify-content:space-between;padding:14px 22px;position:sticky;top:0;z-index:10;
+  }
+  header.topbar .brand{margin:0;}
+  header.topbar .brand h1{color:#fff;}
+  header.topbar .brand small{color:#caa97e;}
+  .who{display:flex;align-items:center;gap:12px;}
+  .who .role-pill{
+    font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;
+    padding:4px 10px;border-radius:20px;background:var(--ember);color:#fff;
+  }
+  .who button{
+    background:transparent;border:1px solid #5c473a;color:var(--sand);
+    padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;
+  }
+  .who button:hover{background:#3a2a22;}
+
+  main{max-width:1100px;margin:0 auto;padding:26px 20px 60px;}
+  .stat-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:26px;}
+  .stat-card{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+    flex:1;min-width:150px;
+  }
+  .stat-card .num{font-family:var(--font-display);font-size:28px;color:var(--ember-deep);}
+  .stat-card .label{font-size:12px;color:#8a7565;text-transform:uppercase;letter-spacing:0.8px;margin-top:2px;}
+
+  .panel{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:22px;
+  }
+  .panel h2{font-family:var(--font-display);font-size:18px;margin:0 0 16px;color:var(--char);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;color:#8a7565;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;padding:8px 10px;border-bottom:2px solid var(--line);}
+  td{padding:10px 10px;border-bottom:1px solid #f0e6d6;}
+  tr:hover td{background:#fdf8ef;}
+  .status-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;}
+  .status-Pending{background:#fbe8c8;color:var(--warn);}
+  .status-Assigned{background:#e3edff;color:#2d5fae;}
+  .status-OutforDelivery{background:#fde3c0;color:var(--ember-deep);}
+  .status-Delivered{background:#e1f0e2;color:var(--ok);}
+  .status-Cancelled{background:#f6dcd8;color:var(--danger);}
+
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+  @media print{
+    header.topbar, .tab-nav, .who, #notif-bell, #notif-panel,
+    button, select, input, .btn-small, #wa-send-box{ display:none !important; }
+    body{ background:#fff; }
+    .panel{ box-shadow:none; border:1px solid #ccc; }
+    main{ padding:0; }
+  }
+
+  /* ---- MOBILE OPTIMISATION ---- */
+  @media (max-width:600px){
+    header.topbar{padding:10px 14px;}
+    header.topbar .brand h1{font-size:15px;}
+    .who button{padding:6px 10px;font-size:12px;}
+    main{padding:14px 12px 60px;}
+    .stat-row{gap:10px;}
+    .stat-card{min-width:120px;padding:14px 14px;}
+    .stat-card .num{font-size:22px;}
+    .tab-nav{gap:2px;overflow-x:auto;padding-bottom:2px;flex-wrap:nowrap;}
+    .tab-btn{padding:8px 12px;font-size:12px;white-space:nowrap;}
+    .panel{padding:14px 12px;}
+    table{font-size:12px;}
+    th,td{padding:7px 6px;}
+    .login-card{padding:28px 20px;}
+    .pin-row{gap:8px;}
+    .pin-box{width:44px;height:50px;font-size:20px;}
+    button.primary{font-size:13px;}
+    /* Make driver delivery cards tap-friendly */
+    .btn-small{padding:9px 14px;font-size:13px;}
+    /* Stack driver action buttons */
+    [style*="display:flex;gap:8px;flex-wrap:wrap"] button,
+    [style*="display:flex;gap:8px;flex-wrap:wrap"] a{
+      flex:1;text-align:center;min-width:120px;
+    }
+    #notif-panel{width:calc(100vw - 32px);right:8px;}
+  }
+  select{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;
+    font-size:14px;background:#fffdfa;color:var(--char);
+  }
+  .btn-small{padding:6px 12px;font-size:12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;}
+  .btn-small:hover{background:var(--sand);}
+  .empty-state{color:#a08e7c;font-size:13px;padding:20px 0;text-align:center;}
+  .toast{
+    position:fixed;bottom:24px;right:24px;background:var(--char);color:#fff;padding:13px 20px;
+    border-radius:10px;font-size:13px;box-shadow:0 10px 30px -10px rgba(0,0,0,0.4);display:none;z-index:50;
+  }
+  .tab-nav{display:flex;gap:6px;margin-bottom:18px;border-bottom:2px solid var(--line);}
+  .tab-btn{
+    background:transparent;border:none;padding:10px 18px;font-size:14px;font-weight:600;
+    color:#8a7565;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+  }
+  .tab-btn:hover{color:var(--char);}
+  .tab-btn.active{color:var(--ember-deep);border-bottom-color:var(--ember);}
+
+  /* INVOICE MODAL */
+  #invoice-modal{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  #invoice-modal.open{display:flex;}
+  #invoice-inner{
+    background:#fff;border-radius:16px;padding:32px 28px;max-width:480px;width:100%;
+    max-height:90vh;overflow-y:auto;position:relative;
+  }
+  #invoice-close{
+    position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#8a7565;
+  }
+  @media print{
+    body > *:not(#invoice-modal){ display:none !important; }
+    #invoice-modal{ position:static;background:none;padding:0;display:block !important; }
+    #invoice-inner{ box-shadow:none;border-radius:0;max-height:none; }
+    #invoice-close, #invoice-print-btn{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">🔥</div>
+      <div>
+        <h1>Stala's Gas</h1>
+        <small>Business Manager</small>
+      </div>
+    </div>
+
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-staff-btn">Staff</button>
+      <button class="login-tab" id="tab-admin-btn">Admin</button>
+    </div>
+
+    <!-- STAFF PIN LOGIN -->
+    <div id="staff-login">
+      <label for="staff-select">Your name</label>
+      <select id="staff-select">
+        <option value="">Select your name…</option>
+      </select>
+      <label style="margin-top:12px;">PIN</label>
+      <div class="pin-row">
+        <input class="pin-box" id="p1" type="password" inputmode="numeric" maxlength="1">
+        <input class="pin-box" id="p2" type="password" inputmode="numeric" maxlength="1">
+        <input class="pin-box" id="p3" type="password" inputmode="numeric" maxlength="1">
+        <input class="pin-box" id="p4" type="password" inputmode="numeric" maxlength="1">
+      </div>
+      <button class="primary" id="staff-login-btn" style="margin-top:16px;">Sign in</button>
+    </div>
+
+    <!-- ADMIN EMAIL LOGIN -->
+    <div id="admin-login" style="display:none;">
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" placeholder="you@stala.co.za" autocomplete="username">
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      <button class="primary" id="login-btn" style="margin-top:4px;">Sign in</button>
+    </div>
+
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" style="width:32px;height:32px;font-size:16px;">🔥</div>
+      <div><h1 style="font-size:17px;">Stala's Gas</h1></div>
+    </div>
+    <div class="who">
+      <span id="who-name"></span>
+      <span class="role-pill" id="who-role"></span>
+      <div id="notif-bell" style="display:none;position:relative;cursor:pointer;align-items:center;" title="New orders">
+        <span style="font-size:20px;">🔔</span>
+        <span id="notif-count" style="
+          position:absolute;top:-6px;right:-8px;background:var(--ember);color:#fff;
+          border-radius:20px;font-size:10px;font-weight:700;padding:2px 6px;min-width:16px;text-align:center;
+        ">0</span>
+      </div>
+      <button id="logout-btn">Log out</button>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION PANEL -->
+  <div id="notif-panel" style="
+    display:none;position:fixed;top:58px;right:16px;width:320px;max-height:400px;overflow-y:auto;
+    background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 50px -10px rgba(0,0,0,0.2);
+    z-index:100;padding:16px;
+  ">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <strong style="font-size:14px;">New orders</strong>
+      <button id="notif-clear" style="font-size:12px;color:var(--ember);background:none;border:none;cursor:pointer;">Clear all</button>
+    </div>
+    <div id="notif-list"></div>
+  </div>
+
+  <main id="main-content">
+    <div class="empty-state">Loading…</div>
+  </main>
+
+  <!-- INVOICE MODAL -->
+  <div id="invoice-modal">
+    <div id="invoice-inner">
+      <button id="invoice-close">✕</button>
+      <div id="invoice-content"></div>
+      <button class="primary" id="invoice-print-btn" style="margin-top:20px;max-width:200px;">🖨 Print / Save PDF</button>
+    </div>
+  </div>
+
+  <!-- STATUS TIMELINE MODAL -->
+  <div id="timeline-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;position:relative;">
+      <button id="timeline-close" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#8a7565;">✕</button>
+      <h2 style="font-family:var(--font-display);font-size:18px;margin:0 0 16px;" id="timeline-title">Order history</h2>
+      <div id="timeline-content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIG ============ */
+const SUPABASE_URL = "https://kaqrxufvvyljpdtnwowj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_FK3b49UnfyeMxKpcL0v92w_p0Lf5brf";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const EMAILJS_PUBLIC_KEY = "UuKKnY5gfgBQ3bq0";
+const EMAILJS_SERVICE_ID = "service_8eq8kp4";
+const EMAILJS_TEMPLATE_ID = "template_8oetxyw";
+const WHATSAPP_NUMBER = "27725744458"; // 072 574 4458 in international format, no +
+const NOTIFY_EMAIL = "info@stala.co.za";
+emailjs.init(EMAILJS_PUBLIC_KEY);
+
+const CYL_SIZES = ['3kg','5kg','7kg','9kg','14kg','19kg','48kg'];
+const ORDER_TYPES = ['Exchange','Refill','Cylinder Only','Gas and Cylinder'];
+const STATUSES = ['Pending','Assigned','Out for Delivery','Delivered','Cancelled'];
+
+let currentProfile = null;
+let priceList = {}; // { '9kg': 250.00, ... }
+
+async function loadPrices(){
+  const { data, error } = await sb.from('prices').select('*');
+  if(!error && data){
+    priceList = {};
+    data.forEach(p => priceList[`${p.order_type}|${p.cylinder_size}`] = parseFloat(p.price));
+  }
+}
+
+function showToast(msg, isError=false){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#b23a2e' : '#241712';
+  t.style.display = 'block';
+  setTimeout(()=> t.style.display='none', 3200);
+}
+
+/* ============ ORDER STATUS TIMELINE ============ */
+async function showTimeline(order){
+  const modal = document.getElementById('timeline-modal');
+  const content = document.getElementById('timeline-content');
+  const title = document.getElementById('timeline-title');
+  title.textContent = `Order #${order.order_number||(1000+order.id)} — ${order.customer_name}`;
+  content.innerHTML = `<div class="empty-state">Loading…</div>`;
+  modal.style.display = 'flex';
+
+  const { data: history, error } = await sb.from('order_status_history')
+    .select('*').eq('order_id', order.id).order('created_at', { ascending: true });
+
+  const initialEntry = {
+    new_status: order.status === 'Pending' ? 'Order created' : null,
+    old_status: null,
+    changed_by_name: 'System',
+    created_at: order.created_at
+  };
+
+  const entries = [
+    { new_status: 'Order created', changed_by_name: '', created_at: order.created_at },
+    ...(history||[])
+  ];
+
+  content.innerHTML = entries.map((h, i)=>{
+    const isLast = i === entries.length - 1;
+    const statusColor = h.new_status === 'Delivered' ? 'var(--ok)'
+      : h.new_status === 'Cancelled' ? 'var(--danger)'
+      : h.new_status === 'Order created' ? 'var(--ember)' : 'var(--char)';
+    return `
+      <div style="display:flex;gap:14px;margin-bottom:${isLast?'0':'16px'};">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:12px;height:12px;border-radius:50%;background:${statusColor};flex-shrink:0;margin-top:3px;"></div>
+          ${!isLast?`<div style="width:2px;flex:1;background:var(--line);margin-top:4px;"></div>`:''}
+        </div>
+        <div style="padding-bottom:${isLast?'0':'4px'};">
+          <div style="font-weight:600;font-size:13px;color:${statusColor};">${h.new_status}</div>
+          <div style="font-size:12px;color:#8a7565;">${new Date(h.created_at).toLocaleString('en-ZA')}${h.changed_by_name?' · '+h.changed_by_name:''}</div>
+          ${h.note?`<div style="font-size:12px;color:var(--char-soft);margin-top:2px;">${h.note}</div>`:''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============ QUICK REORDER ============ */
+function quickReorder(order){
+  // Switch to orders tab and pre-fill form
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+  document.querySelector('.tab-btn[data-tab="orders"]')?.classList.add('active');
+  document.getElementById('tab-orders').style.display='block';
+  // Pre-fill fields after a tick to let the DOM settle
+  setTimeout(()=>{
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+    set('f-name', order.customer_name);
+    set('f-phone', order.customer_phone);
+    set('f-address', order.delivery_address||'');
+    set('f-type', order.order_type);
+    set('f-size', order.cylinder_size);
+    set('f-qty', order.quantity);
+    set('f-amount', parseFloat(order.amount||0).toFixed(2));
+    set('f-payment', order.payment_method||'');
+    set('f-notes', order.delivery_notes||'');
+    document.getElementById('f-name')?.scrollIntoView({behavior:'smooth'});
+    showToast(`Form pre-filled for ${order.customer_name} — check and save.`);
+  }, 100);
+}
+
+/* ============ INVOICE / RECEIPT ============ */
+function showInvoice(order){
+  const modal = document.getElementById('invoice-modal');
+  const content = document.getElementById('invoice-content');
+  const orderNum = order.order_number||(1000+order.id);
+  const date = new Date(order.created_at).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'});
+  content.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:28px;">🔥</div>
+      <h2 style="font-family:var(--font-display);margin:4px 0;font-size:22px;">Stala's Gas</h2>
+      <div style="font-size:12px;color:#8a7565;">Cape Town · 072 574 4458 · info@stala.co.za</div>
+    </div>
+    <div style="border-top:2px solid var(--char);border-bottom:2px solid var(--char);padding:10px 0;margin:16px 0;display:flex;justify-content:space-between;">
+      <div><strong>Receipt #${orderNum}</strong></div>
+      <div style="color:#8a7565;">${date}</div>
+    </div>
+    <table style="width:100%;font-size:14px;">
+      <tr><td style="padding:5px 0;color:#8a7565;">Customer</td><td style="text-align:right;">${order.customer_name}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Phone</td><td style="text-align:right;">${order.customer_phone}</td></tr>
+      ${order.delivery_address?`<tr><td style="padding:5px 0;color:#8a7565;">Address</td><td style="text-align:right;">${order.delivery_address}</td></tr>`:''}
+      <tr><td colspan="2"><hr style="border:none;border-top:1px solid var(--line);margin:8px 0;"></td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Order type</td><td style="text-align:right;">${order.order_type}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Cylinder size</td><td style="text-align:right;">${order.cylinder_size}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Quantity</td><td style="text-align:right;">${order.quantity}</td></tr>
+      <tr><td style="padding:5px 0;color:#8a7565;">Payment</td><td style="text-align:right;">${order.payment_method||'—'}</td></tr>
+      ${order.delivery_notes?`<tr><td style="padding:5px 0;color:#8a7565;">Notes</td><td style="text-align:right;font-size:12px;">${order.delivery_notes}</td></tr>`:''}
+      <tr><td colspan="2"><hr style="border:none;border-top:2px solid var(--char);margin:8px 0;"></td></tr>
+      <tr>
+        <td style="font-size:18px;font-weight:700;">TOTAL</td>
+        <td style="text-align:right;font-size:18px;font-weight:700;color:var(--ember-deep);">R${parseFloat(order.amount||0).toFixed(2)}</td>
+      </tr>
+    </table>
+    <div style="text-align:center;margin-top:20px;font-size:12px;color:#8a7565;">
+      Thank you for choosing Stala's Gas!
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('invoice-close')?.addEventListener('click', ()=>{
+    document.getElementById('invoice-modal').classList.remove('open');
+  });
+  document.getElementById('invoice-print-btn')?.addEventListener('click', ()=>window.print());
+  document.getElementById('invoice-modal')?.addEventListener('click', (e)=>{
+    if(e.target === document.getElementById('invoice-modal'))
+      document.getElementById('invoice-modal').classList.remove('open');
+  });
+  document.getElementById('timeline-close')?.addEventListener('click', ()=>{
+    document.getElementById('timeline-modal').style.display='none';
+  });
+  document.getElementById('timeline-modal')?.addEventListener('click', (e)=>{
+    if(e.target===document.getElementById('timeline-modal'))
+      document.getElementById('timeline-modal').style.display='none';
+  });
+});
+
+/* ============ AUTH ============ */
+
+// Tab switching
+document.getElementById('tab-staff-btn').addEventListener('click', ()=>{
+  document.getElementById('staff-login').style.display='block';
+  document.getElementById('admin-login').style.display='none';
+  document.getElementById('tab-staff-btn').classList.add('active');
+  document.getElementById('tab-admin-btn').classList.remove('active');
+});
+document.getElementById('tab-admin-btn').addEventListener('click', ()=>{
+  document.getElementById('admin-login').style.display='block';
+  document.getElementById('staff-login').style.display='none';
+  document.getElementById('tab-admin-btn').classList.add('active');
+  document.getElementById('tab-staff-btn').classList.remove('active');
+});
+
+// Load staff list into dropdown (non-admin profiles)
+async function loadStaffDropdown(){
+  const { data } = await sb.from('profiles').select('id, full_name, role').neq('role','admin').order('full_name');
+  const sel = document.getElementById('staff-select');
+  if(data && data.length){
+    data.forEach(p=>{
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = `${p.full_name} (${p.role})`;
+      sel.appendChild(opt);
+    });
+  }
+}
+loadStaffDropdown();
+
+// PIN box auto-advance
+['p1','p2','p3','p4'].forEach((id, i, arr)=>{
+  const el = document.getElementById(id);
+  el.addEventListener('input', ()=>{
+    el.value = el.value.replace(/\D/g,'').slice(0,1);
+    if(el.value && i < arr.length-1) document.getElementById(arr[i+1]).focus();
+  });
+  el.addEventListener('keydown', e=>{
+    if(e.key==='Backspace' && !el.value && i > 0) document.getElementById(arr[i-1]).focus();
+    if(e.key==='Enter') doStaffLogin();
+  });
+});
+
+// Staff PIN login
+document.getElementById('staff-login-btn').addEventListener('click', doStaffLogin);
+
+async function doStaffLogin(){
+  const profileId = document.getElementById('staff-select').value;
+  const pin = ['p1','p2','p3','p4'].map(id=>document.getElementById(id).value).join('');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display='none';
+  if(!profileId){ errEl.textContent='Please select your name.'; errEl.style.display='block'; return; }
+  if(pin.length !== 4){ errEl.textContent='Enter your 4-digit PIN.'; errEl.style.display='block'; return; }
+
+  const btn = document.getElementById('staff-login-btn');
+  btn.disabled=true; btn.textContent='Signing in…';
+
+  // Look up their stored auth email
+  const { data: profile, error: profErr } = await sb.from('profiles').select('auth_email').eq('id', profileId).single();
+  if(profErr || !profile?.auth_email){
+    btn.disabled=false; btn.textContent='Sign in';
+    errEl.textContent = 'Account not found. Ask your admin to re-add you.';
+    errEl.style.display='block';
+    return;
+  }
+
+  const { data, error } = await sb.auth.signInWithPassword({ email: profile.auth_email, password: pin + 'stala' });
+  btn.disabled=false; btn.textContent='Sign in';
+  if(error){
+    errEl.textContent = 'Incorrect PIN. Try again.';
+    errEl.style.display='block';
+    ['p1','p2','p3','p4'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('p1').focus();
+    return;
+  }
+  await loadProfileAndRoute();
+}
+
+// Admin email login
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if(!email || !password){ errEl.textContent = 'Enter your email and password.'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign in';
+  if(error){
+    errEl.textContent = error.message || 'Could not sign in. Check your details.';
+    errEl.style.display = 'block';
+    return;
+  }
+  await loadProfileAndRoute();
+}
+
+document.getElementById('logout-btn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+  currentProfile = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+});
+
+async function loadProfileAndRoute(){
+  const { data: userData } = await sb.auth.getUser();
+  if(!userData?.user){ return; }
+  const { data: profile, error } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('id', userData.user.id)
+    .single();
+
+  if(error || !profile){
+    showToast('No profile found for this account. Ask your admin to add you.', true);
+    await sb.auth.signOut();
+    return;
+  }
+  currentProfile = profile;
+  await loadPrices();
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('who-name').textContent = profile.full_name;
+  document.getElementById('who-role').textContent = profile.role;
+  if(profile.role === 'admin'){
+    document.getElementById('notif-bell').style.display = 'flex';
+  }
+  routeToDashboard();
+}
+
+/* Restore session on page load */
+sb.auth.getSession().then(({ data })=>{
+  if(data?.session){ loadProfileAndRoute(); }
+});
+
+/* ============ ROUTING ============ */
+function routeToDashboard(){
+  if(currentProfile.role === 'admin'){
+    renderAdminDashboard();
+    startOrderNotifications();
+  }
+  else if(currentProfile.role === 'sales') renderSalesDashboard();
+  else if(currentProfile.role === 'driver') renderDriverDashboard();
+}
+
+/* ============ REALTIME ORDER NOTIFICATIONS (Admin only) ============ */
+let notifChannel = null;
+let notifications = [];
+
+function startOrderNotifications(){
+  const bell = document.getElementById('notif-bell');
+  if(!bell) return;
+
+  // Toggle panel on bell click
+  bell.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const panel = document.getElementById('notif-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', ()=>{
+    document.getElementById('notif-panel').style.display = 'none';
+  });
+  document.getElementById('notif-clear').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    notifications = [];
+    updateNotifUI();
+  });
+
+  // Subscribe to new orders via Supabase Realtime
+  if(notifChannel) notifChannel.unsubscribe();
+  notifChannel = sb.channel('new-orders')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'orders'
+    }, payload => {
+      const o = payload.new;
+      // Only notify if order was NOT placed by Mike (admin)
+      if(o.created_by === currentProfile.id) return;
+      notifications.unshift({
+        id: o.id,
+        text: `New order #${o.order_number||(1000+o.id)} — ${o.customer_name} (${o.cylinder_size} ${o.order_type})`,
+        time: new Date().toLocaleTimeString()
+      });
+      updateNotifUI();
+      // Flash the page title
+      document.title = `(${notifications.length}) New Order — Stala's Gas`;
+      setTimeout(()=>{ document.title = "Stala's Gas — Business Manager"; }, 4000);
+    })
+    .subscribe();
+}
+
+function updateNotifUI(){
+  const count = notifications.length;
+  const countEl = document.getElementById('notif-count');
+  const listEl = document.getElementById('notif-list');
+  if(countEl) countEl.textContent = count;
+  const bell = document.getElementById('notif-bell');
+  if(bell) bell.style.opacity = count > 0 ? '1' : '0.4';
+  if(listEl){
+    listEl.innerHTML = count === 0
+      ? `<div class="empty-state" style="padding:10px 0;">No new orders yet.</div>`
+      : notifications.map(n=>`
+          <div style="padding:10px 0;border-bottom:1px solid var(--line);">
+            <div style="font-size:13px;font-weight:600;">${n.text}</div>
+            <div style="font-size:11px;color:#8a7565;margin-top:2px;">${n.time}</div>
+          </div>
+        `).join('');
+  }
+}
+
+/* ============ SHARED: ORDER FORM ============ */
+function orderFormHTML(){
+  return `
+  <div class="panel">
+    <h2>New order</h2>
+    <div class="form-grid">
+      <div><label>Customer name</label><input id="f-name" placeholder="e.g. Thandi Nkosi"></div>
+      <div><label>Phone number</label><input id="f-phone" placeholder="e.g. 0821234567"></div>
+      <div class="full"><label>Delivery address</label><input id="f-address" placeholder="e.g. 12 Voortrekker Rd, Bellville"></div>
+      <div class="full"><label>Delivery notes <span style="font-weight:400;color:#8a7565;">(gate code, special instructions…)</span></label><input id="f-notes" placeholder="e.g. Green gate, ring bell twice"></div>
+      <div>
+        <label>Order type</label>
+        <select id="f-type"><option value="">Select</option>${ORDER_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Cylinder size</label>
+        <select id="f-size"><option value="">Select</option>${CYL_SIZES.map(s=>`<option>${s}</option>`).join('')}</select>
+      </div>
+      <div><label>Quantity</label><input id="f-qty" type="number" min="1" value="1"></div>
+      <div><label>Amount (R)</label><input id="f-amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div>
+        <label>Payment method</label>
+        <select id="f-payment"><option value="">Select</option><option>Cash</option><option>EFT</option><option>Card</option></select>
+      </div>
+    </div>
+    <button class="primary" style="margin-top:14px;max-width:220px;" id="save-order-btn">Save order</button>
+    <div id="wa-send-box" style="margin-top:14px;"></div>
+  </div>`;
+}
+
+function wireOrderForm(onSaved){
+  const sizeEl = document.getElementById('f-size');
+  const qtyEl = document.getElementById('f-qty');
+  const amountEl = document.getElementById('f-amount');
+  const typeEl = document.getElementById('f-type');
+  const phoneEl = document.getElementById('f-phone');
+  const nameEl = document.getElementById('f-name');
+  const addressEl = document.getElementById('f-address');
+
+  // Customer auto-fill by phone
+  let phoneTimer;
+  phoneEl.addEventListener('input', ()=>{
+    clearTimeout(phoneTimer);
+    const phone = phoneEl.value.trim();
+    if(phone.length < 7) return;
+    phoneTimer = setTimeout(async ()=>{
+      const { data } = await sb.from('customers').select('*').eq('phone', phone).maybeSingle();
+      if(data){
+        nameEl.value = data.name;
+        addressEl.value = data.address || '';
+        showToast(`Returning customer: ${data.name}`);
+        // Show last 3 orders
+        const { data: history } = await sb.from('orders')
+          .select('*').eq('customer_phone', phone)
+          .order('created_at',{ascending:false}).limit(3);
+        let histBox = document.getElementById('cust-history-box');
+        if(!histBox){
+          histBox = document.createElement('div');
+          histBox.id = 'cust-history-box';
+          histBox.style.cssText = 'background:var(--sand);border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-top:10px;font-size:13px;';
+          document.getElementById('save-order-btn')?.parentElement?.insertBefore(histBox, document.getElementById('save-order-btn'));
+        }
+        if(history && history.length){
+          histBox.innerHTML = `<strong style="font-size:12px;color:#8a7565;text-transform:uppercase;letter-spacing:0.5px;">Last ${history.length} order(s)</strong>` +
+            history.map(o=>`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line);">
+              #${o.order_number||(1000+o.id)} — ${o.order_type} ${o.cylinder_size} × ${o.quantity} — R${parseFloat(o.amount||0).toFixed(2)}
+              <span class="status-pill status-${o.status.replace(/\s/g,'')}" style="margin-left:6px;">${o.status}</span>
+              <span style="color:#aaa;font-size:11px;margin-left:6px;">${new Date(o.created_at).toLocaleDateString()}</span>
+            </div>`).join('');
+        } else {
+          histBox.innerHTML = `<span style="color:#8a7565;">No previous orders for this customer.</span>`;
+        }
+      }
+    }, 500);
+  });
+
+  function autoFillAmount(){
+    const size = sizeEl.value;
+    const type = typeEl.value;
+    const qty = parseInt(qtyEl.value || '1', 10);
+    const key = `${type}|${size}`;
+    if(size && type && priceList[key] !== undefined){
+      amountEl.value = (priceList[key] * qty).toFixed(2);
+    }
+  }
+  sizeEl.addEventListener('change', autoFillAmount);
+  typeEl.addEventListener('change', autoFillAmount);
+  qtyEl.addEventListener('input', autoFillAmount);
+
+  document.getElementById('save-order-btn').addEventListener('click', async ()=>{
+    const name = document.getElementById('f-name').value.trim();
+    const phone = document.getElementById('f-phone').value.trim();
+    const address = document.getElementById('f-address').value.trim();
+    const notes = document.getElementById('f-notes')?.value.trim() || '';
+    const type = document.getElementById('f-type').value;
+    const size = document.getElementById('f-size').value;
+    const qty = parseInt(document.getElementById('f-qty').value || '1', 10);
+    const amount = parseFloat(document.getElementById('f-amount').value || '0');
+    const payment = document.getElementById('f-payment').value;
+
+    if(!name || !phone || !type || !size || !payment){
+      showToast('Fill in customer name, phone, order type, cylinder size and payment method.', true);
+      return;
+    }
+
+    // upsert customer
+    let { data: existingCustomer } = await sb.from('customers').select('id').eq('phone', phone).maybeSingle();
+    let customerId = existingCustomer?.id;
+    if(!customerId){
+      const { data: newCust, error: custErr } = await sb.from('customers')
+        .insert({ name, phone, address }).select('id').single();
+      if(custErr){ showToast('Could not save customer: ' + custErr.message, true); return; }
+      customerId = newCust.id;
+    }
+
+    const { data: insertedOrder, error } = await sb.from('orders').insert({
+      customer_id: customerId,
+      customer_name: name,
+      customer_phone: phone,
+      delivery_address: address,
+      delivery_notes: notes || null,
+      order_type: type,
+      cylinder_size: size,
+      quantity: qty,
+      amount: amount,
+      payment_method: payment,
+      status: 'Pending',
+      created_by: currentProfile.id
+    }).select('id').single();
+    if(error){ showToast('Could not save order: ' + error.message, true); return; }
+    showToast('Order saved.');
+    const orderNum = insertedOrder?.order_number||(1000+(insertedOrder?.id||0));
+
+    // Send automatic email notification
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      order_id: orderNum,
+      customer_name: name,
+      customer_phone: phone,
+      delivery_address: address || 'N/A',
+      order_type: type,
+      cylinder_size: size,
+      quantity: qty,
+      amount: amount.toFixed(2),
+      payment_method: payment,
+      to_email: NOTIFY_EMAIL
+    }).catch(()=>{ /* fail silently, order is already saved */ });
+
+    // Build WhatsApp share link with order details
+    const waText = encodeURIComponent(
+      `New Stala's Gas order #${orderNum}:\n` +
+      `Customer: ${name}\n` +
+      `Phone: ${phone}\n` +
+      `Address: ${address || 'N/A'}\n` +
+      `Type: ${type}\n` +
+      `Cylinder: ${qty} x ${size}\n` +
+      `Amount: R${amount.toFixed(2)}\n` +
+      `Payment: ${payment}`
+    );
+    const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${waText}`;
+    const waBox = document.getElementById('wa-send-box');
+    if(waBox){
+      waBox.innerHTML = `<a href="${waLink}" target="_blank" class="primary" style="display:inline-block;text-decoration:none;text-align:center;padding:12px;border-radius:9px;background:#25D366;color:#fff;font-weight:700;max-width:240px;">Send order to WhatsApp</a>`;
+    }
+
+    onSaved && onSaved();
+  });
+}
+
+/* ============ ADMIN DASHBOARD ============ */
+/* ============ SHARED: CUSTOMER SEARCH ============ */
+function customerSearchHTML(){
+  return `
+  <div class="panel">
+    <h2>Customer lookup</h2>
+    <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Search by name or phone number to see a customer's full order history.</p>
+    <input id="cust-search" placeholder="e.g. Thandi or 0821234567" style="margin-bottom:10px;">
+    <div id="cust-results"></div>
+  </div>`;
+}
+
+function wireCustomerSearch(){
+  const input = document.getElementById('cust-search');
+  const resultsEl = document.getElementById('cust-results');
+  if(!input || !resultsEl) return;
+  // Clone to remove any old listeners before re-attaching
+  const fresh = input.cloneNode(true);
+  input.parentNode.replaceChild(fresh, input);
+  let timer;
+  fresh.addEventListener('input', ()=>{
+    clearTimeout(timer);
+    const q = fresh.value.trim();
+    if(!q){ resultsEl.innerHTML=''; return; }
+    timer = setTimeout(()=>runCustomerSearch(q, resultsEl), 350);
+  });
+  fresh.focus();
+}
+
+async function runCustomerSearch(query, resultsEl){
+  if(!query){ resultsEl.innerHTML = ''; return; }
+  resultsEl.innerHTML = `<div class="empty-state">Searching…</div>`;
+
+  const { data: customers, error } = await sb
+    .from('customers')
+    .select('*')
+    .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+    .limit(10);
+
+  if(error){ resultsEl.innerHTML = `<div class="empty-state">Search failed: ${error.message}</div>`; return; }
+  if(!customers.length){ resultsEl.innerHTML = `<div class="empty-state">No customers found.</div>`; return; }
+
+  resultsEl.innerHTML = customers.map(c => `
+    <div class="cust-card" data-phone="${c.phone}" style="border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:8px;cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:start;">
+        <div>
+          <strong>${c.name}</strong> — ${c.phone}
+          ${c.address ? `<div style="font-size:12px;color:#8a7565;margin-top:2px;">${c.address}</div>` : ''}
+        </div>
+        <div style="text-align:right;font-size:12px;">
+          ${c.credit_limit>0?`<div style="color:var(--warn);">Credit limit: R${parseFloat(c.credit_limit).toFixed(2)}</div>`:''}
+        </div>
+      </div>
+      <div class="cust-orders" data-phone="${c.phone}" style="margin-top:10px;display:none;"></div>
+    </div>
+  `).join('');
+
+  resultsEl.querySelectorAll('.cust-card').forEach(card=>{
+    card.addEventListener('click', async ()=>{
+      const phone = card.dataset.phone;
+      const ordersEl = card.querySelector('.cust-orders');
+      const isOpen = ordersEl.style.display === 'block';
+      resultsEl.querySelectorAll('.cust-orders').forEach(el=>el.style.display='none');
+      if(isOpen) return;
+
+      ordersEl.innerHTML = `<div class="empty-state">Loading orders…</div>`;
+      ordersEl.style.display = 'block';
+      const { data: custOrders, error: ordErr } = await sb
+        .from('orders')
+        .select('*')
+        .eq('customer_phone', phone)
+        .order('created_at', { ascending:false });
+
+      if(ordErr){ ordersEl.innerHTML = `<div class="empty-state">Could not load orders: ${ordErr.message}</div>`; return; }
+      if(!custOrders.length){ ordersEl.innerHTML = `<div class="empty-state">No orders yet for this customer.</div>`; return; }
+
+      const totalSpent = custOrders.reduce((sum,o)=> sum + (parseFloat(o.amount)||0), 0);
+      const totalUnpaid = custOrders.filter(o=>!o.is_paid&&o.status!=='Cancelled').reduce((sum,o)=>sum+(parseFloat(o.amount)||0),0);
+      const { data: custData } = await sb.from('customers').select('credit_limit,notes').eq('phone',phone).maybeSingle();
+      const creditLimit = parseFloat(custData?.credit_limit||0);
+      const overLimit = creditLimit > 0 && totalUnpaid > creditLimit;
+
+      ordersEl.innerHTML = `
+        <div style="font-size:12px;color:#8a7565;margin-bottom:8px;">${custOrders.length} order(s) — R${totalSpent.toFixed(2)} total</div>
+        ${totalUnpaid>0?`<div style="font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:8px;background:${overLimit?'#fde8e8':'#fff9ec'};color:${overLimit?'var(--danger)':'var(--warn)'};">⚠ Outstanding: R${totalUnpaid.toFixed(2)}${overLimit?' — OVER CREDIT LIMIT':''}</div>`:''}
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <input id="cl-input-${phone}" type="number" placeholder="Credit limit (R)" value="${creditLimit||''}" style="width:140px;padding:6px 8px;font-size:12px;">
+          <button class="btn-small set-credit-btn" data-phone="${phone}">Set credit limit</button>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Date</th><th>Type</th><th>Cylinder</th><th>Qty</th><th>Amount</th><th>Paid</th><th>Status</th></tr></thead>
+          <tbody>
+            ${custOrders.map(o=>`
+              <tr>
+                <td>
+              <span class="order-num">${o.order_number||(1000+o.id)}</span>
+              ${canManage?`<button class="btn-small edit-order-num" data-id="${o.id}" data-num="${o.order_number||(1000+o.id)}" style="font-size:10px;padding:2px 6px;margin-top:3px;">✏️</button>`:''}
+            </td>
+                <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                <td>${o.order_type}</td>
+                <td>${o.cylinder_size}</td>
+                <td>${o.quantity}</td>
+                <td>R${parseFloat(o.amount||0).toFixed(2)}</td>
+                <td>${o.is_paid?'✓':'⚠'}</td>
+                <td><span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      ordersEl.querySelector('.set-credit-btn')?.addEventListener('click', async (e)=>{
+        const ph = e.target.dataset.phone;
+        const limit = parseFloat(document.getElementById(`cl-input-${ph}`)?.value||'0');
+        const { error } = await sb.from('customers').update({credit_limit:limit}).eq('phone',ph);
+        if(error){ showToast('Could not update credit limit: '+error.message,true); return; }
+        showToast(`Credit limit set to R${limit.toFixed(2)}.`);
+      });
+    });
+  });
+}
+
+async function renderAdminDashboard(){
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="empty-state">Loading dashboard…</div>`;
+
+  const { data: orders, error } = await sb.from('orders').select('*').order('created_at', { ascending:false });
+  if(error){ main.innerHTML = `<div class="empty-state">Could not load orders: ${error.message}</div>`; return; }
+
+  const { data: drivers } = await sb.from('profiles').select('id, full_name').eq('role', 'driver');
+  const { data: stockRows } = await sb.from('stock').select('*');
+
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((sum,o)=> sum + (parseFloat(o.amount)||0), 0);
+  const pending = orders.filter(o=>o.status==='Pending').length;
+
+  const lowStock = (stockRows||[]).filter(r => r.full_count < r.low_stock_threshold);
+
+  main.innerHTML = `
+    ${lowStock.length ? `
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
+      ⚠️ <strong>Low stock alert:</strong>
+      ${lowStock.map(r=>`${r.location} — ${r.cylinder_size}: only ${r.full_count} left`).join(' &nbsp;|&nbsp; ')}
+    </div>` : ''}
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">${totalOrders}</div><div class="label">Total orders</div></div>
+      <div class="stat-card"><div class="num">R${totalRevenue.toFixed(2)}</div><div class="label">Total revenue</div></div>
+      <div class="stat-card"><div class="num">${pending}</div><div class="label">Pending orders</div></div>
+      <div class="stat-card" style="${orders.filter(o=>!o.is_paid&&o.status!=='Cancelled').length>0?'border-color:var(--warn);':''}" >
+        <div class="num" style="color:var(--warn);">${orders.filter(o=>!o.is_paid&&o.status!=='Cancelled').length}</div>
+        <div class="label">Unpaid orders</div>
+      </div>
+    </div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="orders">Orders</button>
+      <button class="tab-btn" data-tab="customers">Customers</button>
+      <button class="tab-btn" data-tab="reports">Reports</button>
+      <button class="tab-btn" data-tab="recon">Reconciliation</button>
+      <button class="tab-btn" data-tab="prices">Prices</button>
+      <button class="tab-btn" data-tab="stock">Stock</button>
+      <button class="tab-btn" data-tab="staff">Staff</button>
+    </div>
+
+    <div class="tab-content" id="tab-orders">
+      ${orderFormHTML()}
+      <div class="panel">
+        <h2>All orders</h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <input id="order-search" placeholder="Search customer or phone…" style="flex:1;min-width:160px;">
+          <select id="order-status-filter" style="min-width:140px;">
+            <option value="">All statuses</option>
+            ${STATUSES.map(s=>`<option>${s}</option>`).join('')}
+            <option>Cancelled</option>
+          </select>
+          <button id="export-csv-btn" class="btn-small" style="white-space:nowrap;">⬇ Export CSV</button>
+          <button id="print-btn" class="btn-small" style="white-space:nowrap;">🖨 Print / PDF</button>
+        </div>
+        <div id="bulk-dispatch-bar" style="display:none;background:var(--sand);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span id="bulk-count" style="font-size:13px;font-weight:600;"></span>
+          <select id="bulk-driver-select" style="min-width:160px;">
+            <option value="">Assign driver…</option>
+            ${(drivers||[]).map(d=>`<option value="${d.id}">${d.full_name}</option>`).join('')}
+          </select>
+          <button id="bulk-assign-btn" class="primary" style="max-width:160px;padding:8px 16px;">Assign all selected</button>
+          <button id="bulk-clear-btn" class="btn-small">Clear selection</button>
+        </div>
+        <div id="orders-table"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-recon" style="display:none;">
+      <div class="panel">
+        <h2>Driver reconciliation reports</h2>
+        <div id="recon-list"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-customers" style="display:none;">
+      ${customerSearchHTML()}
+    </div>
+
+    <div class="tab-content" id="tab-reports" style="display:none;">
+      <div id="reports-content"><div class="empty-state">Loading reports…</div></div>
+      <div class="panel" style="margin-top:0;">
+        <h2>Daily summary</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Send yesterday's order summary to your WhatsApp.</p>
+        <button class="primary" id="daily-summary-btn" style="max-width:240px;background:#25D366;">📲 Send yesterday's summary</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-staff" style="display:none;">
+      <div class="panel">
+        <h2>Add staff member</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Add any driver or sales person — as many as you need. They sign in by selecting their name + entering their 4-digit PIN. No email required.</p>
+        <div class="form-grid">
+          <div><label>Full name</label><input id="new-staff-name" placeholder="e.g. Chris"></div>
+          <div>
+            <label>Role</label>
+            <select id="new-staff-role">
+              <option value="driver">Driver</option>
+              <option value="sales">Sales</option>
+            </select>
+          </div>
+          <div><label>4-digit PIN</label><input id="new-staff-pin" type="password" inputmode="numeric" maxlength="4" placeholder="e.g. 1234" style="letter-spacing:6px;font-size:18px;"></div>
+          <div><label>Confirm PIN</label><input id="new-staff-pin2" type="password" inputmode="numeric" maxlength="4" placeholder="e.g. 1234" style="letter-spacing:6px;font-size:18px;"></div>
+        </div>
+        <button class="primary" id="add-staff-btn" style="margin-top:14px;max-width:200px;">Add staff member</button>
+      </div>
+      <div class="panel">
+        <h2>Current staff</h2>
+        <div id="staff-list"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-prices" style="display:none;">
+      <div class="panel">
+        <h2>Cylinder prices</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Set a price for each order type and cylinder size.</p>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Order type</th>${CYL_SIZES.map(s=>`<th>${s}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${ORDER_TYPES.map(type=>`
+              <tr>
+                <td><strong>${type}</strong></td>
+                ${CYL_SIZES.map(size=>{
+                  const key = `${type}|${size}`;
+                  const val = priceList[key] !== undefined ? priceList[key].toFixed(2) : '0.00';
+                  return `<td><input type="number" min="0" step="0.01" class="price-input" data-type="${type}" data-size="${size}" value="${val}" style="width:80px;padding:6px 8px;"></td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+        <button class="primary" id="save-prices-btn" style="margin-top:14px;max-width:200px;">Save prices</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-stock" style="display:none;">
+      <div class="panel">
+        <h2>Stock levels</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Full cylinders on hand. Set "Alert at" threshold — highlighted in yellow when stock is low.</p>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Location</th>${CYL_SIZES.map(s=>`<th>${s}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${['Warehouse','Branch 1','Branch 2'].map(loc=>`
+              <tr>
+                <td><strong>${loc}</strong></td>
+                ${CYL_SIZES.map(size=>{
+                  const row = (stockRows||[]).find(r=>r.location===loc && r.cylinder_size===size);
+                  const val = row ? row.full_count : 0;
+                  const threshold = row ? (row.low_stock_threshold||5) : 5;
+                  const isLow = val < threshold;
+                  return `<td>
+                    <input type="number" min="0" class="stock-input" data-location="${loc}" data-size="${size}" value="${val}" style="width:68px;padding:5px 6px;${isLow?'border-color:var(--warn);background:#fff9ec;':''}">
+                    <div style="font-size:10px;color:#8a7565;margin-top:3px;">Alert≤<input type="number" min="0" class="threshold-input" data-location="${loc}" data-size="${size}" value="${threshold}" style="width:36px;padding:2px 4px;font-size:10px;border:1px solid var(--line);border-radius:4px;"></div>
+                  </td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+        <button class="primary" id="save-stock-btn" style="margin-top:14px;max-width:200px;">Save stock</button>
+      </div>
+    </div>
+  `;
+  renderOrdersTable(orders, true, drivers || []);
+  wireOrderForm(()=>renderAdminDashboard());
+
+  // Order search + filter (client-side)
+  let allOrders = orders;
+  let selectedOrderIds = new Set();
+
+  function updateBulkBar(){
+    const bar = document.getElementById('bulk-dispatch-bar');
+    const countEl = document.getElementById('bulk-count');
+    if(!bar) return;
+    if(selectedOrderIds.size > 0){
+      bar.style.display = 'flex';
+      countEl.textContent = `${selectedOrderIds.size} order(s) selected`;
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+
+  function applyOrderFilters(){
+    const q = (document.getElementById('order-search')?.value||'').toLowerCase();
+    const status = document.getElementById('order-status-filter')?.value||'';
+    const filtered = allOrders.filter(o=>{
+      const matchQ = !q || o.customer_name.toLowerCase().includes(q) || o.customer_phone.includes(q);
+      const matchS = !status || o.status === status;
+      return matchQ && matchS;
+    });
+    renderOrdersTable(filtered, true, drivers||[]);
+    rewireFilters();
+  }
+
+  function rewireFilters(){
+    document.getElementById('order-search')?.addEventListener('input', applyOrderFilters);
+    document.getElementById('order-status-filter')?.addEventListener('change', applyOrderFilters);
+    document.getElementById('export-csv-btn')?.addEventListener('click', exportCSV);
+    document.getElementById('print-btn')?.addEventListener('click', ()=>window.print());
+    document.getElementById('select-all-orders')?.addEventListener('change', (e)=>{
+      document.querySelectorAll('.order-checkbox:not(:disabled)').forEach(cb=>{
+        cb.checked = e.target.checked;
+        const id = cb.dataset.id;
+        if(e.target.checked) selectedOrderIds.add(id);
+        else selectedOrderIds.delete(id);
+      });
+      updateBulkBar();
+    });
+    // Wire checkboxes for bulk select
+    document.querySelectorAll('.order-checkbox').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const id = cb.dataset.id;
+        if(cb.checked) selectedOrderIds.add(id);
+        else selectedOrderIds.delete(id);
+        updateBulkBar();
+      });
+    });
+    document.getElementById('bulk-assign-btn')?.addEventListener('click', async ()=>{
+      const driverId = document.getElementById('bulk-driver-select')?.value;
+      if(!driverId){ showToast('Select a driver first.', true); return; }
+      for(const id of selectedOrderIds){
+        await sb.from('orders').update({ assigned_driver: driverId, status:'Assigned' }).eq('id', id);
+      }
+      showToast(`${selectedOrderIds.size} orders assigned.`);
+      selectedOrderIds.clear();
+      renderAdminDashboard();
+    });
+    document.getElementById('bulk-clear-btn')?.addEventListener('click', ()=>{
+      selectedOrderIds.clear();
+      document.querySelectorAll('.order-checkbox').forEach(cb=>cb.checked=false);
+      updateBulkBar();
+    });
+  }
+
+  rewireFilters();
+
+  // CSV export
+  function exportCSV(){
+    const rows = [['Order #','Customer','Phone','Address','Type','Size','Qty','Amount','Payment','Status','Date','Cancelled Reason']];
+    allOrders.forEach(o=>{
+      rows.push([
+        (o.order_number||(1000+o.id)), o.customer_name, o.customer_phone, o.delivery_address||'',
+        o.order_type, o.cylinder_size, o.quantity,
+        parseFloat(o.amount||0).toFixed(2), o.payment_method||'', o.status,
+        new Date(o.created_at).toLocaleDateString(), o.cancelled_reason||''
+      ]);
+    });
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`stalasgas-orders-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).style.display='block';
+      if(btn.dataset.tab === 'reports'){
+        renderReports(orders);
+        setTimeout(()=>{
+          document.getElementById('daily-summary-btn')?.addEventListener('click', async ()=>{
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1); yesterday.setHours(0,0,0,0);
+            const endOfYesterday = new Date(yesterday); endOfYesterday.setHours(23,59,59,999);
+            const { data: yOrders } = await sb.from('orders').select('*')
+              .gte('created_at', yesterday.toISOString())
+              .lte('created_at', endOfYesterday.toISOString());
+            if(!yOrders||!yOrders.length){ showToast('No orders from yesterday.', true); return; }
+            const totalRev = yOrders.reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const cash = yOrders.filter(o=>o.payment_method==='Cash').reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const eft = yOrders.filter(o=>o.payment_method==='EFT').reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+            const delivered = yOrders.filter(o=>o.status==='Delivered').length;
+            const msg = encodeURIComponent(
+              `📊 Stala's Gas — Daily Summary\n` +
+              `Date: ${yesterday.toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}\n\n` +
+              `Total orders: ${yOrders.length}\n` +
+              `Delivered: ${delivered}\n` +
+              `Pending: ${yOrders.filter(o=>o.status==='Pending').length}\n\n` +
+              `💰 Revenue: R${totalRev.toFixed(2)}\n` +
+              `Cash: R${cash.toFixed(2)}\n` +
+              `EFT: R${eft.toFixed(2)}\n\n` +
+              `Top sizes: ${[...new Set(yOrders.map(o=>o.cylinder_size))].join(', ')}`
+            );
+            window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+          });
+        }, 100);
+      }
+      if(btn.dataset.tab === 'customers') wireCustomerSearch();
+      if(btn.dataset.tab === 'staff') loadStaffList();
+      if(btn.dataset.tab === 'recon') loadReconciliations();
+    });
+  });
+
+  async function loadStaffList(){
+    const el = document.getElementById('staff-list');
+    if(!el) return;
+    const { data, error } = await sb.from('profiles').select('*').neq('role','admin').order('full_name');
+    if(error){ el.innerHTML=`<div class="empty-state">Could not load staff: ${error.message}</div>`; return; }
+    if(!data.length){ el.innerHTML=`<div class="empty-state">No staff added yet.</div>`; return; }
+    el.innerHTML=`
+      <table>
+        <thead><tr><th>Name</th><th>Role</th><th>Action</th></tr></thead>
+        <tbody>
+          ${data.map(p=>`
+            <tr>
+              <td>${p.full_name}</td>
+              <td>${p.role}</td>
+              <td>
+                <button class="btn-small reset-pin" data-id="${p.id}" data-name="${p.full_name}" style="margin-right:6px;">Reset PIN</button>
+                <button class="btn-small remove-staff" data-id="${p.id}" data-name="${p.full_name}" style="color:var(--danger);border-color:var(--danger);">Remove</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    el.querySelectorAll('.reset-pin').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const name = e.target.dataset.name;
+        const newPin = prompt(`Reset PIN for ${name}?\n\nEnter new 4-digit PIN:`);
+        if(!newPin) return;
+        if(!/^\d{4}$/.test(newPin)){ showToast('PIN must be exactly 4 digits.', true); return; }
+        const { error } = await sb.rpc('reset_staff_pin', { staff_id: id, new_pin: newPin });
+        if(error){ showToast('Could not reset PIN: ' + error.message, true); return; }
+        showToast(`PIN for ${name} reset successfully.`);
+      });
+    });
+    el.querySelectorAll('.remove-staff').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const name = e.target.dataset.name;
+        if(!confirm(`Remove ${name}? They will no longer be able to log in.`)) return;
+        // Delete auth user via profile delete (cascade handles it)
+        const { error } = await sb.from('profiles').delete().eq('id', id);
+        if(error){ showToast('Could not remove: ' + error.message, true); return; }
+        showToast(`${name} removed.`);
+        loadStaffList();
+      });
+    });
+  }
+
+  document.getElementById('add-staff-btn').addEventListener('click', async ()=>{
+    const name = document.getElementById('new-staff-name').value.trim();
+    const role = document.getElementById('new-staff-role').value;
+    const pin = document.getElementById('new-staff-pin').value;
+    const pin2 = document.getElementById('new-staff-pin2').value;
+    if(!name){ showToast('Enter a name.', true); return; }
+    if(pin.length !== 4 || !/^\d{4}$/.test(pin)){ showToast('PIN must be exactly 4 digits.', true); return; }
+    if(pin !== pin2){ showToast('PINs do not match.', true); return; }
+
+    const btn = document.getElementById('add-staff-btn');
+    btn.disabled=true; btn.textContent='Creating…';
+
+    // Create Supabase auth user with internal email + PIN as password
+    const slug = name.toLowerCase().replace(/\s+/g,'.').replace(/[^a-z0-9.]/g,'');
+    const tempEmail = `staff.${slug}.${Date.now()}@stala.internal`;
+
+    // Use signUp — trigger will auto-create profile from metadata
+    const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
+      email: tempEmail,
+      password: pin + 'stala',
+      options: { data: { full_name: name, role: role, is_staff: 'true' } }
+    });
+
+    btn.disabled=false; btn.textContent='Add staff member';
+    if(signUpErr){ showToast('Could not create login: ' + signUpErr.message, true); return; }
+
+    const userId = signUpData.user?.id;
+    if(!userId){ showToast('Could not get user ID. Try again.', true); return; }
+
+    // Trigger handles profile creation automatically
+    showToast(`${name} added! They can now log in with PIN: ${pin}.`);
+    document.getElementById('new-staff-name').value='';
+    document.getElementById('new-staff-pin').value='';
+    document.getElementById('new-staff-pin2').value='';
+    loadStaffList();
+    loadStaffDropdown(); // refresh login dropdown
+  });
+
+  document.getElementById('save-prices-btn').addEventListener('click', async ()=>{
+    const inputs = document.querySelectorAll('.price-input');
+    const updates = Array.from(inputs).map(i => ({
+      order_type: i.dataset.type,
+      cylinder_size: i.dataset.size,
+      price: parseFloat(i.value || '0')
+    }));
+    for(const u of updates){
+      const { error } = await sb.from('prices').upsert(u, { onConflict: 'order_type,cylinder_size' });
+      if(error){ showToast('Could not save price for ' + u.order_type + ' ' + u.cylinder_size + ': ' + error.message, true); return; }
+    }
+    await loadPrices();
+    showToast('Prices updated.');
+  });
+
+  document.getElementById('save-stock-btn').addEventListener('click', async ()=>{
+    const inputs = document.querySelectorAll('.stock-input');
+    for(const i of inputs){
+      const location = i.dataset.location;
+      const size = i.dataset.size;
+      const newFull = parseInt(i.value || '0', 10);
+      const existing = (stockRows||[]).find(r=>r.location===location && r.cylinder_size===size);
+      const oldFull = existing ? existing.full_count : 0;
+      const thresholdEl = document.querySelector(`.threshold-input[data-location="${location}"][data-size="${size}"]`);
+      const threshold = thresholdEl ? parseInt(thresholdEl.value||'5',10) : 5;
+
+      const { error } = await sb.from('stock')
+        .upsert({ location, cylinder_size: size, full_count: newFull, empty_count: existing?.empty_count || 0, low_stock_threshold: threshold }, { onConflict: 'location,cylinder_size' });
+      if(error){ showToast(`Could not save stock for ${location} ${size}: ${error.message}`, true); return; }
+
+      if(newFull !== oldFull){
+        await sb.from('stock_movements').insert({
+          moved_by: currentProfile.id,
+          to_location: location,
+          cylinder_size: size,
+          full_qty: newFull - oldFull,
+          note: `Manual stock update: ${oldFull} → ${newFull}`
+        });
+      }
+    }
+    showToast('Stock updated.');
+    // Check for low stock and offer WhatsApp alert
+    const lowAfterSave = [];
+    document.querySelectorAll('.stock-input').forEach(i=>{
+      const val = parseInt(i.value||'0',10);
+      const tEl = document.querySelector(`.threshold-input[data-location="${i.dataset.location}"][data-size="${i.dataset.size}"]`);
+      const threshold = tEl ? parseInt(tEl.value||'5',10) : 5;
+      if(val < threshold) lowAfterSave.push(`${i.dataset.location} ${i.dataset.size}: ${val} left`);
+    });
+    if(lowAfterSave.length){
+      const msg = encodeURIComponent(`⚠️ Stala's Gas — Low Stock Alert!\n\n${lowAfterSave.join('\n')}\n\nPlease arrange restocking.`);
+      if(confirm(`Low stock detected:\n\n${lowAfterSave.join('\n')}\n\nSend WhatsApp alert?`)){
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`,'_blank');
+      }
+    }
+    renderAdminDashboard();
+  });
+}
+
+/* ============ RECONCILIATION (Admin view) ============ */
+async function loadReconciliations(){
+  const el = document.getElementById('recon-list');
+  if(!el) return;
+  el.innerHTML = `<div class="empty-state">Loading…</div>`;
+  const { data, error } = await sb.from('reconciliations')
+    .select('*')
+    .order('created_at', { ascending:false })
+    .limit(50);
+  if(error){ el.innerHTML=`<div class="empty-state">Could not load: ${error.message}</div>`; return; }
+  if(!data.length){ el.innerHTML=`<div class="empty-state">No reports submitted yet.</div>`; return; }
+  el.innerHTML=`
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Driver</th><th>Deliveries</th><th>Cash</th><th>EFT</th><th>Total</th><th>Loaded</th><th>Returned</th><th>Empties</th><th>Notes</th>
+      </tr></thead>
+      <tbody>
+        ${data.map(r=>`
+          <tr>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td>${r.driver_name}</td>
+            <td>${r.deliveries_made}</td>
+            <td>R${parseFloat(r.cash_collected||0).toFixed(2)}</td>
+            <td>R${parseFloat(r.eft_collected||0).toFixed(2)}</td>
+            <td><strong>R${(parseFloat(r.cash_collected||0)+parseFloat(r.eft_collected||0)).toFixed(2)}</strong></td>
+            <td>${r.full_loaded}</td>
+            <td>${r.full_returned}</td>
+            <td>${r.empties_collected}</td>
+            <td style="font-size:12px;color:#8a7565;">${r.notes||'—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+/* ============ REPORTS ============ */
+function renderReports(orders){
+  const el = document.getElementById('reports-content');
+  if(!el) return;
+
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(now); monthAgo.setDate(monthAgo.getDate() - 30);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const delivered = orders.filter(o=>o.status==='Delivered');
+  const todayOrders = orders.filter(o=>new Date(o.created_at).toDateString()===todayStr);
+  const weekOrders = orders.filter(o=>new Date(o.created_at)>=weekAgo);
+  const monthOrders = orders.filter(o=>new Date(o.created_at)>=monthStart);
+
+  const rev = arr => arr.reduce((s,o)=>s+(parseFloat(o.amount)||0),0);
+
+  const byType = {};
+  ORDER_TYPES.forEach(t=>{ byType[t]={count:0,revenue:0}; });
+  orders.forEach(o=>{
+    if(byType[o.order_type]){
+      byType[o.order_type].count++;
+      byType[o.order_type].revenue += parseFloat(o.amount)||0;
+    }
+  });
+
+  const bySize = {};
+  CYL_SIZES.forEach(s=>{ bySize[s]={count:0,revenue:0}; });
+  orders.forEach(o=>{
+    if(bySize[o.cylinder_size]){
+      bySize[o.cylinder_size].count++;
+      bySize[o.cylinder_size].revenue += parseFloat(o.amount)||0;
+    }
+  });
+
+  const custSpend = {};
+  orders.forEach(o=>{
+    const k = o.customer_phone;
+    if(!custSpend[k]) custSpend[k]={ name:o.customer_name, phone:o.customer_phone, total:0, count:0 };
+    custSpend[k].total += parseFloat(o.amount)||0;
+    custSpend[k].count++;
+  });
+  const topCustomers = Object.values(custSpend).sort((a,b)=>b.total-a.total).slice(0,5);
+
+  const monthRev = rev(monthOrders);
+
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="num">${todayOrders.length}</div><div class="label">Orders today</div></div>
+      <div class="stat-card"><div class="num">R${rev(todayOrders).toFixed(2)}</div><div class="label">Revenue today</div></div>
+      <div class="stat-card"><div class="num">${weekOrders.length}</div><div class="label">Orders this week</div></div>
+      <div class="stat-card"><div class="num">R${rev(weekOrders).toFixed(2)}</div><div class="label">Revenue this week</div></div>
+      <div class="stat-card"><div class="num">${monthOrders.length}</div><div class="label">Orders this month</div></div>
+      <div class="stat-card"><div class="num">R${monthRev.toFixed(2)}</div><div class="label">Revenue this month</div></div>
+    </div>
+
+    <div class="panel" id="target-panel">
+      <h2>Monthly revenue target</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:#8a7565;">Target: R</span>
+        <input id="monthly-target-input" type="number" value="0" style="width:120px;padding:7px 10px;">
+        <button class="btn-small" id="save-target-btn">Save target</button>
+      </div>
+      <div id="target-bar-wrap" style="display:none;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+          <span>R${monthRev.toFixed(2)} earned</span>
+          <span id="target-label"></span>
+        </div>
+        <div style="background:var(--line);border-radius:20px;height:18px;overflow:hidden;">
+          <div id="target-bar" style="height:100%;border-radius:20px;background:var(--ember);transition:width .4s ease;width:0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Revenue — last 7 days</h2>
+      <canvas id="revenue-chart" height="100"></canvas>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="panel">
+        <h2>By order type</h2>
+        <table>
+          <thead><tr><th>Type</th><th>Orders</th><th>Revenue</th></tr></thead>
+          <tbody>${ORDER_TYPES.map(t=>`
+            <tr><td>${t}</td><td>${byType[t].count}</td><td>R${byType[t].revenue.toFixed(2)}</td></tr>
+          `).join('')}</tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>By cylinder size</h2>
+        <table>
+          <thead><tr><th>Size</th><th>Orders</th><th>Revenue</th></tr></thead>
+          <tbody>${CYL_SIZES.map(s=>`
+            <tr><td>${s}</td><td>${bySize[s].count}</td><td>R${bySize[s].revenue.toFixed(2)}</td></tr>
+          `).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:0;">
+      <h2>Top customers</h2>
+      ${topCustomers.length ? `
+      <table>
+        <thead><tr><th>Customer</th><th>Phone</th><th>Orders</th><th>Total spent</th></tr></thead>
+        <tbody>${topCustomers.map(c=>`
+          <tr><td>${c.name}</td><td>${c.phone}</td><td>${c.count}</td><td>R${c.total.toFixed(2)}</td></tr>
+        `).join('')}</tbody>
+      </table>` : `<div class="empty-state">No orders yet.</div>`}
+    </div>
+  `;
+
+  // Load and display monthly target
+  sb.from('settings').select('value').eq('key','monthly_target').single().then(({data})=>{
+    const target = parseFloat(data?.value||'0');
+    const input = document.getElementById('monthly-target-input');
+    if(input) input.value = target;
+    if(target > 0){
+      const pct = Math.min(100, (monthRev/target)*100);
+      const bar = document.getElementById('target-bar');
+      const wrap = document.getElementById('target-bar-wrap');
+      const label = document.getElementById('target-label');
+      if(bar){ bar.style.width = pct.toFixed(1)+'%'; bar.style.background = pct>=100?'var(--ok)':'var(--ember)'; }
+      if(wrap) wrap.style.display='block';
+      if(label) label.textContent = `Target: R${target.toFixed(2)} (${pct.toFixed(1)}%)`;
+    }
+  });
+  document.getElementById('save-target-btn')?.addEventListener('click', async ()=>{
+    const val = document.getElementById('monthly-target-input')?.value||'0';
+    await sb.from('settings').upsert({key:'monthly_target',value:val},{onConflict:'key'});
+    showToast('Monthly target saved.');
+    renderReports(orders);
+  });
+
+  // Build 7-day chart
+  const days=[]; const dayRevenue=[]; const dayLabels=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date(now); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+    const nd=new Date(d); nd.setDate(nd.getDate()+1);
+    const dayOrds=orders.filter(o=>{const t=new Date(o.created_at);return t>=d&&t<nd;});
+    dayRevenue.push(rev(dayOrds));
+    dayLabels.push(d.toLocaleDateString('en-ZA',{weekday:'short',day:'numeric'}));
+  }
+  const ctx=document.getElementById('revenue-chart')?.getContext('2d');
+  if(ctx){
+    new Chart(ctx,{
+      type:'bar',
+      data:{labels:dayLabels,datasets:[{label:'Revenue (R)',data:dayRevenue,backgroundColor:'rgba(217,89,12,0.7)',borderColor:'rgba(185,67,10,1)',borderWidth:1,borderRadius:6}]},
+      options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'R'+v}}}}
+    });
+  }
+}
+
+
+/* ============ ORDERS TABLE ============ */
+function renderOrdersTable(orders, canManage, drivers){
+  drivers = drivers || [];
+  const container = document.getElementById('orders-table');
+  if(!orders.length){ container.innerHTML = `<div class="empty-state">No orders found.</div>`; return; }
+  container.innerHTML = `
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        ${canManage?'<th><input type="checkbox" id="select-all-orders" title="Select all"></th>':''}
+        <th>ID</th><th>Customer</th><th>Phone</th><th>Type</th><th>Cylinder</th><th>Qty</th><th>Amount</th><th>Status</th>${canManage?'<th>Action</th><th>Driver</th><th></th>':''}
+      </tr></thead>
+      <tbody>
+        ${orders.map(o=>`
+          <tr data-id="${o.id}" style="${o.status==='Cancelled'?'opacity:0.5;text-decoration:line-through;':''}">
+            ${canManage?`<td><input type="checkbox" class="order-checkbox" data-id="${o.id}" ${o.status==='Cancelled'?'disabled':''}></td>`:''}
+            <td>
+              <span class="order-num">${o.order_number||(1000+o.id)}</span>
+              ${canManage?`<button class="btn-small edit-order-num" data-id="${o.id}" data-num="${o.order_number||(1000+o.id)}" style="font-size:10px;padding:2px 6px;margin-top:3px;">✏️</button>`:''}
+            </td>
+            <td>${o.customer_name}</td>
+            <td>${o.customer_phone}</td>
+            <td>${o.order_type}</td>
+            <td>${o.cylinder_size}</td>
+            <td>${o.quantity}</td>
+            <td>R${parseFloat(o.amount||0).toFixed(2)}</td>
+            <td>
+              <span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span>
+              ${o.cancelled_reason?`<div style="font-size:11px;color:var(--danger);margin-top:2px;text-decoration:none;">${o.cancelled_reason}</div>`:''}
+              ${o.is_paid?`<div style="font-size:11px;color:var(--ok);margin-top:2px;">✓ Paid</div>`:`<div style="font-size:11px;color:var(--warn);margin-top:2px;">⚠ Unpaid</div>`}
+              ${o.delivery_notes?`<div style="font-size:11px;color:#8a7565;margin-top:2px;">📌 ${o.delivery_notes}</div>`:''}
+            </td>
+            ${canManage ? `<td>
+              <select class="status-select" data-id="${o.id}" ${o.status==='Cancelled'?'disabled':''}>
+                ${STATUSES.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td>
+              <select class="driver-select" data-id="${o.id}" ${drivers.length===0||o.status==='Cancelled' ? 'disabled' : ''}>
+                <option value="">${drivers.length===0 ? 'No drivers yet' : 'Unassigned'}</option>
+                ${drivers.map(d=>`<option value="${d.id}" ${o.assigned_driver===d.id?'selected':''}>${d.full_name}</option>`).join('')}
+              </select>
+            </td>
+            <td style="white-space:nowrap;">
+              ${o.status!=='Cancelled'?`
+                <a href="https://wa.me/${o.customer_phone.replace(/^0/,'27')}?text=${encodeURIComponent(`Hi ${o.customer_name}, regarding your Stala's Gas order #${o.order_number||(1000+o.id)} (${o.quantity} x ${o.cylinder_size} ${o.order_type}).`)}" target="_blank" class="btn-small" style="background:#25D366;color:#fff;border-color:#25D366;text-decoration:none;display:inline-block;margin-bottom:4px;">💬 WhatsApp</a>
+                <button class="btn-small invoice-btn" data-id="${o.id}" style="display:block;margin-bottom:4px;">🧾 Invoice</button>
+                <button class="btn-small timeline-btn" data-id="${o.id}" style="display:block;margin-bottom:4px;">📋 Timeline</button>
+                <button class="btn-small reorder-btn" data-id="${o.id}" style="display:block;margin-bottom:4px;">🔄 Reorder</button>
+                ${!o.is_paid?`<button class="btn-small mark-paid-btn" data-id="${o.id}" style="color:var(--ok);border-color:var(--ok);display:block;margin-bottom:4px;">✓ Mark paid</button>`:''}
+                <button class="btn-small cancel-order" data-id="${o.id}" data-num="${o.order_number||(1000+o.id)}" style="color:var(--danger);border-color:var(--danger);display:block;">✕ Cancel</button>
+              `:'<span style="font-size:11px;color:#aaa;">Cancelled</span>'}
+            </td>` : ''}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+  if(canManage){
+    container.querySelectorAll('.status-select').forEach(sel=>{
+      sel.addEventListener('change', async (e)=>{
+        const id = e.target.dataset.id;
+        const newStatus = e.target.value;
+        const { error } = await sb.from('orders').update({ status: newStatus }).eq('id', id);
+        if(error){ showToast('Could not update status: ' + error.message, true); }
+        else showToast(`Order #${id} marked ${newStatus}.`);
+      });
+    });
+    container.querySelectorAll('.driver-select').forEach(sel=>{
+      sel.addEventListener('change', async (e)=>{
+        const id = e.target.dataset.id;
+        const driverId = e.target.value || null;
+        const updates = { assigned_driver: driverId };
+        if(driverId) updates.status = 'Assigned';
+        const { error } = await sb.from('orders').update(updates).eq('id', id);
+        if(error){ showToast('Could not assign driver: ' + error.message, true); }
+        else showToast(`Order #${id} assigned.`);
+      });
+    });
+    container.querySelectorAll('.edit-order-num').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const current = e.target.dataset.num;
+        const newNum = prompt(`Edit order number for order ID ${id}:\n\nCurrent: ${current}\nFormat: YYMMXX (e.g. 260701)`, current);
+        if(!newNum || newNum === current) return;
+        const { error } = await sb.from('orders').update({ order_number: newNum }).eq('id', id);
+        if(error){ showToast('Could not update order number: '+error.message, true); return; }
+        showToast(`Order number updated to ${newNum}.`);
+        renderAdminDashboard();
+      });
+    });
+    container.querySelectorAll('.timeline-btn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const order = orders.find(o=>o.id==id);
+        if(order) showTimeline(order);
+      });
+    });
+    container.querySelectorAll('.reorder-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        const id = e.target.dataset.id;
+        const order = orders.find(o=>o.id==id);
+        if(order) quickReorder(order);
+      });
+    });
+    container.querySelectorAll('.invoice-btn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const order = orders.find(o=>o.id==id);
+        if(order) showInvoice(order);
+      });
+    });
+    container.querySelectorAll('.mark-paid-btn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const { error } = await sb.from('orders').update({ is_paid: true, paid_at: new Date().toISOString() }).eq('id', id);
+        if(error){ showToast('Could not mark paid: '+error.message, true); return; }
+        showToast('Order marked as paid.');
+        renderAdminDashboard();
+      });
+    });
+    container.querySelectorAll('.cancel-order').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.target.dataset.id;
+        const num = e.target.dataset.num;
+        const reason = prompt(`Cancel order #${num}?\n\nEnter reason (required for audit trail):`);
+        if(!reason) return;
+        const { error } = await sb.from('orders').update({
+          status: 'Cancelled',
+          cancelled_reason: reason,
+          cancelled_at: new Date().toISOString(),
+          cancelled_by: currentProfile.id
+        }).eq('id', id);
+        if(error){ showToast('Could not cancel order: ' + error.message, true); }
+        else{ showToast(`Order #${num} cancelled. Order number kept for audit.`); renderAdminDashboard(); }
+      });
+    });
+  }
+}
+
+/* ============ SALES DASHBOARD ============ */
+async function renderSalesDashboard(){
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="empty-state">Loading…</div>`;
+  const { data: orders, error } = await sb.from('orders').select('*').order('created_at', { ascending:false }).limit(100);
+  if(error){ main.innerHTML = `<div class="empty-state">Could not load orders: ${error.message}</div>`; return; }
+  const { data: stockRows } = await sb.from('stock').select('*');
+
+  main.innerHTML = `
+    <div class="panel">
+      <h2>Stock levels</h2>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Location</th>${CYL_SIZES.map(s=>`<th>${s}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${['Warehouse','Branch 1','Branch 2'].map(loc=>`
+            <tr>
+              <td><strong>${loc}</strong></td>
+              ${CYL_SIZES.map(size=>{
+                const row = (stockRows||[]).find(r=>r.location===loc && r.cylinder_size===size);
+                return `<td>${row ? row.full_count : 0}</td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    ${orderFormHTML()}
+    ${customerSearchHTML()}
+    <div class="panel">
+      <h2>Recent orders</h2>
+      <div id="orders-table"></div>
+    </div>
+  `;
+  renderOrdersTable(orders, false);
+  wireOrderForm(()=>renderSalesDashboard());
+  wireCustomerSearch();
+}
+
+/* ============ DRIVER DASHBOARD ============ */
+async function renderDriverDashboard(){
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="empty-state">Loading…</div>`;
+
+  const [{ data: orders, error }, { data: myStock }] = await Promise.all([
+    sb.from('orders')
+      .select('*')
+      .eq('assigned_driver', currentProfile.id)
+      .neq('status', 'Delivered')
+      .neq('status', 'Cancelled')
+      .order('created_at', { ascending:true }),
+    sb.from('driver_stock')
+      .select('*')
+      .eq('driver_id', currentProfile.id)
+  ]);
+
+  if(error){ main.innerHTML = `<div class="empty-state">Could not load: ${error.message}</div>`; return; }
+
+  main.innerHTML = `
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="d-deliveries">Deliveries</button>
+      <button class="tab-btn" data-tab="d-stock">My Stock</button>
+      <button class="tab-btn" data-tab="d-empties">Empties</button>
+      <button class="tab-btn" data-tab="d-recon">End of Day</button>
+    </div>
+
+    <!-- DELIVERIES TAB -->
+    <div class="tab-content" id="tab-d-deliveries">
+      <div class="panel">
+        <h2>Your deliveries today</h2>
+        <div id="driver-orders"></div>
+      </div>
+    </div>
+
+    <!-- VEHICLE STOCK TAB -->
+    <div class="tab-content" id="tab-d-stock" style="display:none;">
+      <div class="panel">
+        <h2>My vehicle stock</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Full and empty cylinders currently on your truck. Update and save after loading or returning stock.</p>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Size</th><th>Full</th><th>Empty</th></tr></thead>
+          <tbody>
+            ${CYL_SIZES.map(size=>{
+              const row = (myStock||[]).find(r=>r.cylinder_size===size);
+              return `<tr>
+                <td><strong>${size}</strong></td>
+                <td><input type="number" min="0" class="dstock-input" data-size="${size}" data-type="full" value="${row?.full_count||0}" style="width:70px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;"></td>
+                <td><input type="number" min="0" class="dstock-input" data-size="${size}" data-type="empty" value="${row?.empty_count||0}" style="width:70px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;"></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+        <button class="primary" id="save-dstock-btn" style="margin-top:14px;max-width:200px;">Save stock</button>
+      </div>
+    </div>
+
+    <!-- EMPTIES TAB -->
+    <div class="tab-content" id="tab-d-empties" style="display:none;">
+      <div class="panel">
+        <h2>Log empty cylinders collected</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Record empties collected from customers today.</p>
+        <div class="form-grid">
+          <div>
+            <label>Cylinder size</label>
+            <select id="empty-size"><option value="">Select</option>${CYL_SIZES.map(s=>`<option>${s}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label>Quantity collected</label>
+            <input id="empty-qty" type="number" min="1" value="1">
+          </div>
+          <div class="full">
+            <label>Note (optional)</label>
+            <input id="empty-note" placeholder="e.g. collected from Thandi on 12 Voortrekker">
+          </div>
+        </div>
+        <button class="primary" id="log-empty-btn" style="margin-top:14px;max-width:220px;">Log empties</button>
+      </div>
+      <div class="panel">
+        <h2>Today's empties log</h2>
+        <div id="empties-log"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+    <!-- END OF DAY TAB -->
+    <div class="tab-content" id="tab-d-recon" style="display:none;">
+      <div class="panel">
+        <h2>End of day report</h2>
+        <p style="font-size:13px;color:#8a7565;margin-top:-8px;">Submit this before you finish for the day.</p>
+        <div class="form-grid">
+          <div><label>Deliveries made</label><input id="r-deliveries" type="number" min="0" value="${orders.length}"></div>
+          <div><label>Cash collected (R)</label><input id="r-cash" type="number" min="0" step="0.01" value="0.00"></div>
+          <div><label>EFT collected (R)</label><input id="r-eft" type="number" min="0" step="0.01" value="0.00"></div>
+          <div><label>Full cylinders loaded today</label><input id="r-loaded" type="number" min="0" value="0"></div>
+          <div><label>Full cylinders returned</label><input id="r-returned" type="number" min="0" value="0"></div>
+          <div><label>Empty cylinders collected</label><input id="r-empties" type="number" min="0" value="0"></div>
+          <div class="full"><label>Notes</label><input id="r-notes" placeholder="Anything to report to Mike…"></div>
+        </div>
+        <button class="primary" id="submit-recon-btn" style="margin-top:14px;max-width:220px;">Submit report</button>
+      </div>
+    </div>
+  `;
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn[data-tab^="d-"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn[data-tab^="d-"]').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content[id^="tab-d-"]').forEach(c=>c.style.display='none');
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).style.display='block';
+      if(btn.dataset.tab==='d-empties') loadEmptiesLog();
+    });
+  });
+
+  // Render deliveries
+  const container = document.getElementById('driver-orders');
+  if(!orders.length){
+    container.innerHTML = `<div class="empty-state">No deliveries assigned to you right now.</div>`;
+  } else {
+    container.innerHTML = orders.map(o=>`
+      <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>#${o.order_number||(1000+o.id)} — ${o.customer_name}</strong>
+          <span class="status-pill status-${o.status.replace(/\s/g,'')}">${o.status}</span>
+        </div>
+        <div style="font-size:13px;color:#6b5a4a;margin-top:4px;">${o.delivery_address||'No address'} · ${o.customer_phone}</div>
+        <div style="font-size:13px;margin-top:4px;">${o.order_type} — ${o.quantity} × ${o.cylinder_size}</div>
+        ${o.delivery_notes?`<div style="font-size:12px;background:#fff9ec;border:1px solid var(--warn);border-radius:6px;padding:5px 8px;margin-top:6px;">📌 ${o.delivery_notes}</div>`:''}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-small mark-out" data-id="${o.id}">Out for delivery</button>
+          <button class="btn-small mark-delivered" data-id="${o.id}">Mark delivered</button>
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.mark-out').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        await sb.from('orders').update({ status:'Out for Delivery' }).eq('id', e.target.dataset.id);
+        showToast('Marked out for delivery.');
+        renderDriverDashboard();
+      });
+    });
+    container.querySelectorAll('.mark-delivered').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        await sb.from('orders').update({ status:'Delivered', delivered_at: new Date().toISOString() }).eq('id', e.target.dataset.id);
+        showToast('Marked delivered.');
+        renderDriverDashboard();
+      });
+    });
+  }
+
+  // Save vehicle stock
+  document.getElementById('save-dstock-btn').addEventListener('click', async ()=>{
+    const inputs = document.querySelectorAll('.dstock-input');
+    const grouped = {};
+    inputs.forEach(i=>{
+      if(!grouped[i.dataset.size]) grouped[i.dataset.size]={full:0,empty:0};
+      grouped[i.dataset.size][i.dataset.type] = parseInt(i.value||'0',10);
+    });
+    for(const [size, counts] of Object.entries(grouped)){
+      const { error } = await sb.from('driver_stock').upsert({
+        driver_id: currentProfile.id,
+        cylinder_size: size,
+        full_count: counts.full,
+        empty_count: counts.empty
+      }, { onConflict: 'driver_id,cylinder_size' });
+      if(error){ showToast('Could not save stock for '+size+': '+error.message, true); return; }
+    }
+    showToast('Vehicle stock saved.');
+  });
+
+  // Log empties
+  document.getElementById('log-empty-btn').addEventListener('click', async ()=>{
+    const size = document.getElementById('empty-size').value;
+    const qty = parseInt(document.getElementById('empty-qty').value||'1',10);
+    const note = document.getElementById('empty-note').value.trim();
+    if(!size){ showToast('Select a cylinder size.', true); return; }
+    const { error } = await sb.from('stock_movements').insert({
+      moved_by: currentProfile.id,
+      from_location: 'Customer',
+      to_location: 'Driver Vehicle',
+      cylinder_size: size,
+      empty_qty: qty,
+      note: note || `${qty} x ${size} empties collected`
+    });
+    if(error){ showToast('Could not log empties: '+error.message, true); return; }
+    // Also update driver_stock empty count
+    const existing = (myStock||[]).find(r=>r.cylinder_size===size);
+    await sb.from('driver_stock').upsert({
+      driver_id: currentProfile.id,
+      cylinder_size: size,
+      full_count: existing?.full_count||0,
+      empty_count: (existing?.empty_count||0) + qty
+    }, { onConflict: 'driver_id,cylinder_size' });
+    showToast(`${qty} x ${size} empties logged.`);
+    document.getElementById('empty-size').value='';
+    document.getElementById('empty-qty').value='1';
+    document.getElementById('empty-note').value='';
+    loadEmptiesLog();
+  });
+
+  // Submit end of day reconciliation
+  document.getElementById('submit-recon-btn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('submit-recon-btn');
+    btn.disabled=true; btn.textContent='Submitting…';
+    const { error } = await sb.from('reconciliations').insert({
+      driver_id: currentProfile.id,
+      driver_name: currentProfile.full_name,
+      deliveries_made: parseInt(document.getElementById('r-deliveries').value||'0'),
+      cash_collected: parseFloat(document.getElementById('r-cash').value||'0'),
+      eft_collected: parseFloat(document.getElementById('r-eft').value||'0'),
+      full_loaded: parseInt(document.getElementById('r-loaded').value||'0'),
+      full_returned: parseInt(document.getElementById('r-returned').value||'0'),
+      empties_collected: parseInt(document.getElementById('r-empties').value||'0'),
+      notes: document.getElementById('r-notes').value.trim()
+    });
+    btn.disabled=false; btn.textContent='Submit report';
+    if(error){ showToast('Could not submit: '+error.message, true); return; }
+    showToast('End of day report submitted. Good work today!');
+    // Send WhatsApp summary to Mike
+    const cash = parseFloat(document.getElementById('r-cash').value||'0');
+    const eft = parseFloat(document.getElementById('r-eft').value||'0');
+    const waMsg = encodeURIComponent(
+      `End of Day Report — ${currentProfile.full_name}\n` +
+      `Date: ${new Date().toLocaleDateString()}\n` +
+      `Deliveries: ${document.getElementById('r-deliveries').value}\n` +
+      `Cash: R${cash.toFixed(2)} | EFT: R${eft.toFixed(2)}\n` +
+      `Total collected: R${(cash+eft).toFixed(2)}\n` +
+      `Full loaded: ${document.getElementById('r-loaded').value} | Returned: ${document.getElementById('r-returned').value}\n` +
+      `Empties: ${document.getElementById('r-empties').value}\n` +
+      `Notes: ${document.getElementById('r-notes').value||'None'}`
+    );
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${waMsg}`, '_blank');
+  });
+
+  async function loadEmptiesLog(){
+    const el = document.getElementById('empties-log');
+    if(!el) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const { data, error } = await sb.from('stock_movements')
+      .select('*')
+      .eq('moved_by', currentProfile.id)
+      .eq('from_location','Customer')
+      .gte('created_at', today.toISOString())
+      .order('created_at', { ascending:false });
+    if(error||!data||!data.length){ el.innerHTML=`<div class="empty-state">No empties logged today.</div>`; return; }
+    el.innerHTML=`<table>
+      <thead><tr><th>Time</th><th>Size</th><th>Qty</th><th>Note</th></tr></thead>
+      <tbody>${data.map(r=>`
+        <tr>
+          <td>${new Date(r.created_at).toLocaleTimeString()}</td>
+          <td>${r.cylinder_size}</td>
+          <td>${r.empty_qty}</td>
+          <td>${r.note||''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  }
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
